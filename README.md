@@ -52,3 +52,13 @@ npm install
 # autofixer-registration
 One-page web app built for Auto-Fixer startup to allow users to register with email, upload a short promotional video via Google Drive API and pay a registration fee of R20 to support the app launch. Built with React, Node.js, Tailwind CSS, and MongoDB.
 >>>>>>> d36ca613a3e77a77e59292e17136d8322bf54038
+
+
+### 🧱 Project Progress Log
+
+**Day 2 Update (Oct 25)**  
+- Initialized React frontend  
+- Installed Tailwind CSS  
+- Setup Express backend  
+- Connected frontend and backend locally  
+- Verified CORS and API test working
