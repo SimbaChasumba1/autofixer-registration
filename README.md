@@ -56,9 +56,39 @@ One-page web app built for Auto-Fixer startup to allow users to register with em
 
 ### 🧱 Project Progress Log
 
-**Day 2 Update (Oct 25)**  
+**Day 1 Update**  
 - Initialized React frontend  
 - Installed Tailwind CSS  
 - Setup Express backend  
 - Connected frontend and backend locally  
 - Verified CORS and API test working
+- Created GitHub repo and initial structure (`client/` + `server/`)
+- Installed dotenv and nodemon
+- Configured `.gitignore` and environment variables
+- Basic landing page setup with form layout
+- Verified backend is running (`npm run dev`)
+**Challenges:** Tailwind installation errors on Windows (resolved)
+**Next Goal:** Connect form to backend API and save submissions
+
+
+**Day 2 Update**
+- Add `/api/register` POST route to save data locally
+- Connect frontend form using `fetch()`
+- Display success or error messages
+- Commit and push changes to GitHub
+
+**Day 3 Update**
+ - Create a responsive landing page for AutoFixer using React and Tailwind CSS.
+- Landing page with “About” section and “Register” button  
+- Clean, mobile-friendly design  
+- Deployed locally with Vite + Tailwind
+
+ **Day 4 Update** 
+- Connected the frontend registration form to a backend API.
+- Express.js server handling POST `/register`
+- Registration form on React frontend
+- Connected via Fetch API
+- Stores mock data in memory (no DB yet)
+- Validation for missing inputs
+
+
