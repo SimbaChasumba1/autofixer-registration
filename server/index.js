@@ -1,6 +1,10 @@
 import express from "express";
 
+import multer from "multer";
+
 import cors from "cors";
+
+import fs from "fs";
 
 
 
@@ -12,64 +16,76 @@ app.use(express.json());
 
 
 
-let registrations = [];
+// 📂 Setup multer for mock video uploads
+
+const upload = multer({ dest: "uploads/" });
 
 
 
-// Get all registrations
+// ✅ Registration route
 
-app.get("/api/donors", (req, res) => {
+app.post("/api/register", upload.single("video"), (req, res) => {
 
-  res.json(registrations);
+  const { name, email, phone } = req.body;
 
-});
+  const videoFile = req.file;
 
 
 
-// Register endpoint
+  if (!name || !email || !phone) {
 
-app.post("/api/register", (req, res) => {
-
-  try {
-
-    const { name, email, phone, amount, message } = req.body;
-
-    if (!name || !email || !phone) {
-
-      return res.status(400).json({ success: false, message: "All fields required" });
-
-    }
-
-    registrations.push({ name, email, phone, amount, message });
-
-    console.log("✅ New registration:", name, email, phone, amount);
-
-    res.json({ success: true, message: "Registration saved" });
-
-  } catch (err) {
-
-    console.error("Server error:", err);
-
-    res.status(500).json({ success: false, message: "Server error" });
+    return res.status(400).json({ error: "All fields are required" });
 
   }
 
+
+
+  // 💸 Simulate a R20 payment success
+
+  const paymentStatus = "success";
+
+
+
+  const registration = {
+
+    name,
+
+    email,
+
+    phone,
+
+    video: videoFile ? videoFile.filename : null,
+
+    payment: paymentStatus,
+
+    date: new Date().toISOString(),
+
+  };
+
+
+
+  // 🗂️ Save to a JSON file (mock database)
+
+  const file = "registrations.json";
+
+  const existing = fs.existsSync(file)
+
+    ? JSON.parse(fs.readFileSync(file))
+
+    : [];
+
+  existing.push(registration);
+
+  fs.writeFileSync(file, JSON.stringify(existing, null, 2));
+
+
+
+  res.json({ message: "Registration successful", registration });
+
 });
 
 
 
-// Mock payment
+const PORT = process.env.PORT || 5000;
 
-app.post("/api/pay", (req, res) => {
-
-  const { name } = req.body;
-
-  console.log("Processing payment for:", name);
-
-  setTimeout(() => res.json({ success: true, message: "Payment processed successfully!" }), 1000);
-
-});
-
-
-
-app.listen(5000, () => console.log("Server running on port 5000"));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
