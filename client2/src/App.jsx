@@ -6,6 +6,14 @@ import LandingPage from "./pages/LandingPage";
 
 import RegisterPage from "./pages/RegisterPage";
 
+import PaymentPage from "./pages/PaymentPage";
+
+import SuccessPage from "./pages/SuccessPage";
+
+import UploadVideoPage from "./pages/UploadVideoPage";
+
+
+
 // import RegistrationsPage from "./pages/RegistrationsPage"; // optional
 
 
@@ -18,9 +26,15 @@ const App = () => {
 
       <Routes>
 
-        <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<LandingPage />} />
 
-        <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      <Route path="/upload-video" element={<UploadVideoPage />} />
+
+      <Route path="/payment" element={<PaymentPage />} />
+
+      <Route path="/success" element={<SuccessPage />} />
 
       </Routes>
 
