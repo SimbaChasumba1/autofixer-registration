@@ -4,21 +4,21 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import LandingPage from "./pages/LandingPage";
 
-import RegisterPage from "./pages/RegisterPage";
-
-import PaymentPage from "./pages/PaymentPage";
-
-import SuccessPage from "./pages/SuccessPage";
+import Registration from "./pages/RegisterPage";
 
 import UploadVideoPage from "./pages/UploadVideoPage";
 
+import PaymentPage from "./pages/PaymentPage";
+
+import Success from "./pages/SuccessPage";
+
+import NotFound from "./pages/NotFound";
+import RegisterPage from "./pages/RegisterPage";
+import SuccessPage from "./pages/SuccessPage";
 
 
-// import RegistrationsPage from "./pages/RegistrationsPage"; // optional
 
-
-
-const App = () => {
+export default function App() {
 
   return (
 
@@ -26,15 +26,17 @@ const App = () => {
 
       <Routes>
 
-      <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<LandingPage />} />
 
-      <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-      <Route path="/upload-video" element={<UploadVideoPage />} />
+        <Route path="/upload-video" element={<UploadVideoPage />} />
 
-      <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/payment" element={<PaymentPage />} />
 
-      <Route path="/success" element={<SuccessPage />} />
+        <Route path="/success" element={<SuccessPage />} />
+
+        <Route path="*" element={<NotFound />} />
 
       </Routes>
 
@@ -42,13 +44,4 @@ const App = () => {
 
   );
 
-};
-
-
-
-export default App;
-
-
-
-
-
+}

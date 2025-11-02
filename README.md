@@ -92,3 +92,67 @@ One-page web app built for Auto-Fixer startup to allow users to register with em
 - Validation for missing inputs
 
 
+**Day 5**
+
+- Responsive landing page with a **Register** button
+
+- Fully functional registration form with fields:
+
+  - Name
+
+  - Email
+
+  - Phone
+
+  - Amount
+
+  - Optional message
+
+- Form validation before submission (checks for empty fields, valid email & phone)
+
+- Shows success ✅ / error ❌ messages
+
+- `/api/register` endpoint to store registration data
+
+- `/api/pay` endpoint simulating payment processing
+
+- Error handling on the backend (returns JSON errors instead of crashing)
+- Basic Jest + Supertest tests for `/api/register`
+- Tests verify correct status codes for valid & invalid submissions
+
+**Day 6**
+Added Features:
+- Video upload (mock)
+- Mock R20 payment flow
+
+**Day 7**
+Additions:
+- Modern, responsive landing page with animated gradient and step-by-step UI  
+
+- Registration form (Name, Email, Phone)  
+
+- Video upload (mock placeholder — real Google Drive upload coming next)  
+
+- Mock R20 payment confirmation  
+
+- Dynamic success screen  
+
+- Clean UI and mobile-friendly design  
+
+
+**Day 8**
+
+- Fixed all UI alignment and responsiveness issues across all pages (Landing, Register, Payment, Upload Video, Success)
+
+- Improved the overall look — modern blue theme, centered text, clean spacing, and mobile-friendly design
+
+- Added navigation buttons to return to the Landing Page from all other pages
+
+- Added an “About AutoFixer” section so users can actually learn about the platform
+Explained how AutoFixer connects car owners with top local mechanics
+
+- Fixed payment and success page redirect flow (no more “Network Error”)
+
+- Ensured all forms, buttons, and text elements are responsive and consistent
+
+- Cleaned up folder structure and code for production readiness

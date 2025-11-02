@@ -1,65 +1,142 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
 
-const UploadVideoPage = () => {
-  const [video, setVideo] = useState(null);
+import { useNavigate, Link } from "react-router-dom";
+
+
+
+export default function UploadVideoPage() {
+
   const navigate = useNavigate();
-  const [visible, setVisible] = useState(false);
+
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+
+  const [videoFile, setVideoFile] = useState(null);
+
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
+
+
 
   useEffect(() => {
-    setTimeout(() => setVisible(true), 200);
+
+    const saved = sessionStorage.getItem("autofixer_form");
+
+    if (saved) setForm(JSON.parse(saved));
+
+    if (window.autofixerVideo instanceof File) {
+
+      setVideoFile(window.autofixerVideo);
+
+      setVideoPreviewUrl(URL.createObjectURL(window.autofixerVideo));
+
+    }
+
   }, []);
 
+
+
+  useEffect(() => () => { if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl); }, [videoPreviewUrl]);
+
+
+
   const handleFileChange = (e) => {
-    setVideo(e.target.files[0]);
+
+    const file = e.target.files?.[0] ?? null;
+
+    if (!file) { setVideoFile(null); setVideoPreviewUrl(null); return; }
+
+    const maxBytes = 50 * 1024 * 1024;
+
+    if (file.size > maxBytes) return alert("Video too large (max 50MB).");
+
+    setVideoFile(file);
+
+    setVideoPreviewUrl(URL.createObjectURL(file));
+
   };
 
-  const handleSubmit = (e) => {
+
+
+  const handleContinue = (e) => {
+
     e.preventDefault();
+
+    if (!form.name || !form.email || !form.phone) return alert("Please fill required details");
+
+    sessionStorage.setItem("autofixer_form", JSON.stringify(form));
+
+    if (videoFile) window.autofixerVideo = videoFile;
+
+    else if (window.autofixerVideo) delete window.autofixerVideo;
+
     navigate("/payment");
+
   };
+
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-500 flex flex-col justify-center items-center px-6">
-      <div
-        className={`bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center transform transition-all duration-700 ${visible ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"}`}
-      >
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Upload Your Promo Video</h2>
-        <form onSubmit={handleSubmit}>
-          <label className="block border-2 border-dashed border-indigo-400 rounded-lg p-6 cursor-pointer hover:bg-indigo-50 transition relative group">
-            <input
-              type="file"
-              accept="video/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {video ? (
-              <p className="text-gray-700">{video.name}</p>
-            ) : (
-              <p className="text-indigo-600 font-semibold group-hover:scale-105 transition-transform">
-                Click to upload or drag your video here
-              </p>
-            )}
-          </label>
 
-          {video && (
-            <video
-              src={URL.createObjectURL(video)}
-              controls
-              className="mt-4 rounded-lg w-full"
-            />
-          )}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600 p-4">
 
-          <button
-            type="submit"
-            className="mt-6 w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-500 hover:scale-[1.02] transition-all duration-300"
-          >
-            Continue to Payment
-          </button>
+      <div className="bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-xl p-6">
+
+        <div className="flex justify-between items-center mb-4">
+
+          <h2 className="text-2xl font-bold">Upload Promo Video</h2>
+
+          <Link to="/" className="text-sm text-gray-500 hover:underline">Home</Link>
+
+        </div>
+
+        <p className="text-sm text-gray-600 mb-4">Add a short 10–60s video. We'll ask for payment next.</p>
+
+
+
+        <form onSubmit={handleContinue} className="space-y-4">
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+            <input name="name" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} placeholder="Full name" className="col-span-1 sm:col-span-3 border p-3 rounded" />
+
+            <input name="email" value={form.email} onChange={(e)=>setForm({...form, email:e.target.value})} placeholder="Email" className="col-span-1 sm:col-span-3 border p-3 rounded" />
+
+            <input name="phone" value={form.phone} onChange={(e)=>setForm({...form, phone:e.target.value})} placeholder="Phone" className="col-span-1 sm:col-span-3 border p-3 rounded" />
+
+          </div>
+
+
+
+          <div className="border border-dashed rounded-lg p-4 text-center bg-gray-50">
+
+            <label htmlFor="video-upload" className="cursor-pointer inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Choose Video</label>
+
+            <input id="video-upload" type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
+
+            <p className="mt-3 text-sm text-gray-600">{videoFile ? `Selected: ${videoFile.name} (${Math.round(videoFile.size/1024/1024)}MB)` : "No video chosen"}</p>
+
+            {videoPreviewUrl && (<video src={videoPreviewUrl} controls className="mt-4 w-full rounded" />)}
+
+          </div>
+
+
+
+          <div className="flex gap-3">
+
+            <Link to="/register" className="flex-1 bg-gray-200 py-2 rounded text-center">Back</Link>
+
+            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded">Continue to Payment</button>
+
+          </div>
+
         </form>
-      </div>
-    </div>
-  );
-};
 
-export default UploadVideoPage;
+      </div>
+
+    </div>
+
+  );
+
+}
+
+
+
