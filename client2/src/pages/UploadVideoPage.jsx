@@ -8,11 +8,17 @@ export default function UploadVideoPage() {
 
   const navigate = useNavigate();
 
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+
+
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
 
   const [videoFile, setVideoFile] = useState(null);
 
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
+
+  const [loading, setLoading] = useState(false);
 
 
 
@@ -22,19 +28,19 @@ export default function UploadVideoPage() {
 
     if (saved) setForm(JSON.parse(saved));
 
-    if (window.autofixerVideo instanceof File) {
-
-      setVideoFile(window.autofixerVideo);
-
-      setVideoPreviewUrl(URL.createObjectURL(window.autofixerVideo));
-
-    }
-
   }, []);
 
 
 
-  useEffect(() => () => { if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl); }, [videoPreviewUrl]);
+  useEffect(() => {
+
+    return () => {
+
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+
+    };
+
+  }, [videoPreviewUrl]);
 
 
 
@@ -56,21 +62,89 @@ export default function UploadVideoPage() {
 
 
 
-  const handleContinue = (e) => {
+  async function handleContinue(e) {
 
     e.preventDefault();
 
-    if (!form.name || !form.email || !form.phone) return alert("Please fill required details");
+    if (!form.name || !form.email || !form.phone) {
 
-    sessionStorage.setItem("autofixer_form", JSON.stringify(form));
+      alert("Please fill required details");
 
-    if (videoFile) window.autofixerVideo = videoFile;
+      return;
 
-    else if (window.autofixerVideo) delete window.autofixerVideo;
+    }
 
-    navigate("/payment");
+    setLoading(true);
 
-  };
+    try {
+
+      // 1) Upload temp file if exists
+
+      let tempId = null;
+
+      if (videoFile) {
+
+        const fd = new FormData();
+
+        fd.append("video", videoFile, videoFile.name);
+
+        const upRes = await fetch(`${API_BASE}/api/upload-temp`, { method: "POST", body: fd });
+
+        if (!upRes.ok) throw new Error("Temp upload failed");
+
+        const upJson = await upRes.json();
+
+        tempId = upJson.tempId;
+
+      }
+
+
+
+      // 2) Create pending registration (saves name/email/phone and tempId) -> returns registrationId
+
+      const createRes = await fetch(`${API_BASE}/api/create-pending`, {
+
+        method: "POST",
+
+        headers: { "Content-Type": "application/json" },
+
+        body: JSON.stringify({ ...form, tempId })
+
+      });
+
+      if (!createRes.ok) throw new Error("Failed to create registration");
+
+      const { id } = await createRes.json();
+
+
+
+      // save registration id locally (optional)
+
+      sessionStorage.setItem("autofixer_registration_id", id);
+
+      // also keep form stored
+
+      sessionStorage.setItem("autofixer_form", JSON.stringify(form));
+
+
+
+      // 3) navigate to payment page
+
+      navigate("/payment");
+
+    } catch (err) {
+
+      console.error(err);
+
+      alert("Upload or registration failed. Try again.");
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  }
 
 
 
@@ -87,8 +161,6 @@ export default function UploadVideoPage() {
           <Link to="/" className="text-sm text-gray-500 hover:underline">Home</Link>
 
         </div>
-
-        <p className="text-sm text-gray-600 mb-4">Add a short 10–60s video. We'll ask for payment next.</p>
 
 
 
@@ -108,7 +180,11 @@ export default function UploadVideoPage() {
 
           <div className="border border-dashed rounded-lg p-4 text-center bg-gray-50">
 
-            <label htmlFor="video-upload" className="cursor-pointer inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Choose Video</label>
+            <label htmlFor="video-upload" className="cursor-pointer inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+
+              {videoFile ? "Change Video" : "Choose Video"}
+
+            </label>
 
             <input id="video-upload" type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
 
@@ -124,7 +200,11 @@ export default function UploadVideoPage() {
 
             <Link to="/register" className="flex-1 bg-gray-200 py-2 rounded text-center">Back</Link>
 
-            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded">Continue to Payment</button>
+            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded" disabled={loading}>
+
+              {loading ? "Working..." : "Continue to Payment"}
+
+            </button>
 
           </div>
 
@@ -137,6 +217,8 @@ export default function UploadVideoPage() {
   );
 
 }
+
+
 
 
 

@@ -8,15 +8,13 @@ export default function PaymentPage() {
 
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-  const [card, setCard] = useState({ nameOnCard: "", number: "", expiry: "", cvc: "" });
+
 
   const [processing, setProcessing] = useState(false);
 
-
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
 
 
 
@@ -30,77 +28,51 @@ export default function PaymentPage() {
 
 
 
-  const handlePay = async (e) => {
+  async function handlePay(e) {
 
     e.preventDefault();
-
-    if (!card.nameOnCard || !card.number) return alert("Enter mock card details.");
-
-
 
     setProcessing(true);
 
     try {
 
-      const fd = new FormData();
+      const registrationId = sessionStorage.getItem("autofixer_registration_id");
 
-      const saved = sessionStorage.getItem("autofixer_form");
-
-      const parsed = saved ? JSON.parse(saved) : form;
-
-      fd.append("name", parsed.name);
-
-      fd.append("email", parsed.email);
-
-      fd.append("phone", parsed.phone);
+      if (!registrationId) throw new Error("Missing registration id");
 
 
 
-      if (window.autofixerVideo instanceof File) {
+      const res = await fetch(`${API_BASE}/api/initiate-payfast`, {
 
-        fd.append("video", window.autofixerVideo, window.autofixerVideo.name);
+        method: "POST",
 
-      }
+        headers: { "Content-Type": "application/json" },
 
+        body: JSON.stringify({ amount: 20, registrationId })
 
+      });
 
-      // attach mock payment record
+      if (!res.ok) throw new Error("Failed to initiate payment");
 
-      fd.append("paymentMock", JSON.stringify({ amount: 20, cardLast4: card.number.slice(-4) }));
+      const json = await res.json();
 
+      const { url } = json;
 
+      // redirect the user to PayFast checkout page
 
-      const res = await fetch(`${API_BASE}/api/register`, { method: "POST", body: fd });
-
-      if (!res.ok) {
-
-        const json = await res.json().catch(()=>({ error: "server" }));
-
-        throw new Error(json.error || "Server error");
-
-      }
-
-      await res.json();
-
-      sessionStorage.removeItem("autofixer_form");
-
-      if (window.autofixerVideo) delete window.autofixerVideo;
-
-      navigate("/success");
+      window.location.href = url;
 
     } catch (err) {
 
-      console.error("Payment error:", err);
+      console.error("Payment init error", err);
 
-      alert("Network error. Please try again later.");
-
-    } finally {
+      alert("Payment start failed. Try again.");
 
       setProcessing(false);
 
     }
 
-  };
+  }
 
 
 
@@ -108,7 +80,7 @@ export default function PaymentPage() {
 
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 to-blue-600 p-4">
 
-      <div className="bg-white text-gray-900 p-6 rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
 
         <div className="flex justify-between items-center mb-4">
 
@@ -120,33 +92,27 @@ export default function PaymentPage() {
 
 
 
-        <p className="text-sm text-gray-600 mb-4">This is a mock payment for demo purposes (no real charge).</p>
+        <p className="text-sm text-gray-600 mb-4">This will redirect you to PayFast (sandbox for testing).</p>
 
 
 
-        <form onSubmit={handlePay} className="space-y-3">
+        <div className="space-y-3">
 
-          <input value={card.nameOnCard} onChange={(e)=>setCard({...card, nameOnCard:e.target.value})} placeholder="Name on card" className="w-full border p-3 rounded" required />
+          <div className="bg-gray-50 p-3 rounded">Name: {form.name}</div>
 
-          <input value={card.number} onChange={(e)=>setCard({...card, number:e.target.value})} placeholder="Card number" className="w-full border p-3 rounded" required />
+          <div className="bg-gray-50 p-3 rounded">Email: {form.email}</div>
 
-          <div className="flex gap-2">
+          <div className="bg-gray-50 p-3 rounded">Phone: {form.phone}</div>
 
-            <input value={card.expiry} onChange={(e)=>setCard({...card, expiry:e.target.value})} placeholder="MM/YY" className="flex-1 border p-3 rounded" required />
-
-            <input value={card.cvc} onChange={(e)=>setCard({...card, cvc:e.target.value})} placeholder="CVC" className="w-1/3 border p-3 rounded" required />
-
-          </div>
+        </div>
 
 
 
-          <button type="submit" disabled={processing} className={`w-full py-3 rounded-lg text-white font-semibold ${processing ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}>
+        <button onClick={handlePay} disabled={processing} className={`mt-6 w-full py-3 rounded-lg text-white font-semibold ${processing ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}>
 
-            {processing ? "Processing..." : "Pay R20 & Register"}
+          {processing ? "Redirecting..." : "Pay R20 & Complete Registration"}
 
-          </button>
-
-        </form>
+        </button>
 
       </div>
 
