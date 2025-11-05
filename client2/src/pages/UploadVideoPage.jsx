@@ -1,224 +1,123 @@
-import React, { useEffect, useState } from "react";
-
-import { useNavigate, Link } from "react-router-dom";
-
-
+import React, { useState, useEffect } from "react";
 
 export default function UploadVideoPage() {
-
-  const navigate = useNavigate();
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-
-
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
-
-  const [videoFile, setVideoFile] = useState(null);
-
-  const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
-
+  const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:4041';  // Fallback if the API URL is not defined in .env
 
-
-
+  // Load form from sessionStorage so it matches RegisterPage
   useEffect(() => {
-
-    const saved = sessionStorage.getItem("autofixer_form");
-
-    if (saved) setForm(JSON.parse(saved));
-
+    const savedForm = sessionStorage.getItem("autofixer_form");
+    if (savedForm) setForm(JSON.parse(savedForm));
   }, []);
 
+  const handleFile = (e) => setVideo(e.target.files?.[0] ?? null);
 
-
-  useEffect(() => {
-
-    return () => {
-
-      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
-
-    };
-
-  }, [videoPreviewUrl]);
-
-
-
-  const handleFileChange = (e) => {
-
-    const file = e.target.files?.[0] ?? null;
-
-    if (!file) { setVideoFile(null); setVideoPreviewUrl(null); return; }
-
-    const maxBytes = 50 * 1024 * 1024;
-
-    if (file.size > maxBytes) return alert("Video too large (max 50MB).");
-
-    setVideoFile(file);
-
-    setVideoPreviewUrl(URL.createObjectURL(file));
-
-  };
-
-
-
-  async function handleContinue(e) {
-
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!form.name || !form.email || !form.phone) {
+      return alert("Please fill all fields");
+    }
 
-      alert("Please fill required details");
-
-      return;
-
+    if (!video) {
+      return alert("Please select a video to upload");
     }
 
     setLoading(true);
 
     try {
+      // 1️⃣ Send form + video to backend
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("email", form.email);
+      fd.append("phone", form.phone);
+      fd.append("video", video);
 
-      // 1) Upload temp file if exists
-
-      let tempId = null;
-
-      if (videoFile) {
-
-        const fd = new FormData();
-
-        fd.append("video", videoFile, videoFile.name);
-
-        const upRes = await fetch(`${API_BASE}/api/upload-temp`, { method: "POST", body: fd });
-
-        if (!upRes.ok) throw new Error("Temp upload failed");
-
-        const upJson = await upRes.json();
-
-        tempId = upJson.tempId;
-
-      }
-
-
-
-      // 2) Create pending registration (saves name/email/phone and tempId) -> returns registrationId
-
-      const createRes = await fetch(`${API_BASE}/api/create-pending`, {
-
+      const res = await fetch(`${API}/api/create-pending`, {
         method: "POST",
-
-        headers: { "Content-Type": "application/json" },
-
-        body: JSON.stringify({ ...form, tempId })
-
+        body: fd,
       });
 
-      if (!createRes.ok) throw new Error("Failed to create registration");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Create pending failed");
 
-      const { id } = await createRes.json();
+      const registrationId = json.id;
 
+      // 2️⃣ Initialize Paystack transaction
+      const initRes = await fetch(`${API}/api/create-paystack-transaction`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",  // Set content type
+        },
+        body: JSON.stringify({ registrationId }),
+      });
 
+      const initJson = await initRes.json();
 
-      // save registration id locally (optional)
+      if (!initRes.ok) {
+        throw new Error(initJson.error || initJson.msg || "Paystack init failed");
+      }
 
-      sessionStorage.setItem("autofixer_registration_id", id);
-
-      // also keep form stored
-
-      sessionStorage.setItem("autofixer_form", JSON.stringify(form));
-
-
-
-      // 3) navigate to payment page
-
-      navigate("/payment");
-
+      // 3️⃣ Redirect to Paystack payment page
+      window.location.href = initJson.authorization_url;
     } catch (err) {
-
       console.error(err);
-
-      alert("Upload or registration failed. Try again.");
-
-    } finally {
-
+      alert("Error: " + (err.message || "Something went wrong"));
       setLoading(false);
-
     }
-
-  }
-
-
+  };
 
   return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-blue-600 to-cyan-500 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+        <h2 className="text-2xl font-bold mb-4 text-center">Register & Upload Promo Video</h2>
 
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600 p-4">
-
-      <div className="bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-xl p-6">
-
-        <div className="flex justify-between items-center mb-4">
-
-          <h2 className="text-2xl font-bold">Upload Promo Video</h2>
-
-          <Link to="/" className="text-sm text-gray-500 hover:underline">Home</Link>
-
-        </div>
-
-
-
-        <form onSubmit={handleContinue} className="space-y-4">
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-            <input name="name" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} placeholder="Full name" className="col-span-1 sm:col-span-3 border p-3 rounded" />
-
-            <input name="email" value={form.email} onChange={(e)=>setForm({...form, email:e.target.value})} placeholder="Email" className="col-span-1 sm:col-span-3 border p-3 rounded" />
-
-            <input name="phone" value={form.phone} onChange={(e)=>setForm({...form, phone:e.target.value})} placeholder="Phone" className="col-span-1 sm:col-span-3 border p-3 rounded" />
-
-          </div>
-
-
-
-          <div className="border border-dashed rounded-lg p-4 text-center bg-gray-50">
-
-            <label htmlFor="video-upload" className="cursor-pointer inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-
-              {videoFile ? "Change Video" : "Choose Video"}
-
-            </label>
-
-            <input id="video-upload" type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
-
-            <p className="mt-3 text-sm text-gray-600">{videoFile ? `Selected: ${videoFile.name} (${Math.round(videoFile.size/1024/1024)}MB)` : "No video chosen"}</p>
-
-            {videoPreviewUrl && (<video src={videoPreviewUrl} controls className="mt-4 w-full rounded" />)}
-
-          </div>
-
-
-
-          <div className="flex gap-3">
-
-            <Link to="/register" className="flex-1 bg-gray-200 py-2 rounded text-center">Back</Link>
-
-            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded" disabled={loading}>
-
-              {loading ? "Working..." : "Continue to Payment"}
-
-            </button>
-
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            name="name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Full name"
+            className="w-full border p-3 rounded-lg"
+            required
+          />
+          <input
+            name="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="Email address"
+            type="email"
+            className="w-full border p-3 rounded-lg"
+            required
+          />
+          <input
+            name="phone"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            placeholder="Phone number"
+            className="w-full border p-3 rounded-lg"
+            required
+          />
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleFile}
+            className="w-full border p-3 rounded-lg"
+          />
+          <p className="text-sm text-gray-500">
+            Video upload is temporary until payment is verified.
+          </p>
+          <button
+            type="submit"
+            className="w-full bg-indigo-600 text-white py-3 rounded-lg"
+            disabled={loading}
+          >
+            {loading ? "Processing..." : "Pay R20 & Register"}
+          </button>
         </form>
-
       </div>
-
     </div>
-
   );
-
 }
-
-
-
-
-

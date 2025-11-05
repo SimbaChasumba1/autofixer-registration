@@ -154,5 +154,17 @@ Explained how AutoFixer connects car owners with top local mechanics
 - Fixed payment and success page redirect flow (no more “Network Error”)
 
 - Ensured all forms, buttons, and text elements are responsive and consistent
-
+SS
 - Cleaned up folder structure and code for production readiness
+
+Fix: Implemented registration and Paystack payment flow
+
+- Set up the backend API for handling user registration, file upload, and Paystack payment initialization.
+- Added frontend components for registering user details and uploading a video.
+- Integrated Paystack transaction creation in backend with error handling and response logging.
+- Improved error handling on frontend with form validation.
+- Debugging implemented on both backend and frontend to log API responses and identify issues.
+- Currently investigating "Failed to Fetch" error with Paystack API.
+
+Known issue:
+- The Paystack payment flow 

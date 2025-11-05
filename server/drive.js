@@ -2,101 +2,83 @@ import { google } from "googleapis";
 
 import fs from "fs";
 
-import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 
 
-const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
+function getCredsFromEnvOrFile() {
 
-const SERVICE_JSON_ENV = process.env.GOOGLE_SERVICE_ACCOUNT; // JSON string
+  if (process.env.GOOGLE_SERVICE_ACCOUNT) {
 
-const SERVICE_JSON_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_PATH; // optional file path
-
-
-
-function getCredentials() {
-
-  if (SERVICE_JSON_ENV) {
-
-    return JSON.parse(SERVICE_JSON_ENV);
+    return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
   }
 
-  if (SERVICE_JSON_PATH && fs.existsSync(SERVICE_JSON_PATH)) {
+  const p = process.env.GOOGLE_SERVICE_ACCOUNT_PATH;
 
-    return JSON.parse(fs.readFileSync(SERVICE_JSON_PATH, "utf8"));
+  if (p && fs.existsSync(p)) {
+
+    return JSON.parse(fs.readFileSync(p, "utf8"));
 
   }
 
-  throw new Error("Google service account credentials not found in env or path");
+  throw new Error("Google service account JSON not found in env or path");
 
 }
 
 
 
-let authClient;
-
-export function getAuth() {
-
-  if (authClient) return authClient;
-
-  const credentials = getCredentials();
-
-  authClient = new google.auth.GoogleAuth({
-
-    credentials,
-
-    scopes: ["https://www.googleapis.com/auth/drive.file"]
-
-  });
-
-  return authClient;
-
-}
+const creds = getCredsFromEnvOrFile();
 
 
 
-/**
+const auth = new google.auth.GoogleAuth({
 
- * Uploads a file at localFilePath to Drive folder set in env GOOGLE_DRIVE_FOLDER_ID.
+  credentials: creds,
 
- * Returns { id, name, mimeType, size, webViewLink }.
+  scopes: ["https://www.googleapis.com/auth/drive.file"]
 
- */
-
-export async function uploadFileToDrive(localFilePath, originalName, mimeType) {
-
-  const auth = getAuth();
-
-  const drive = google.drive({ version: "v3", auth });
+});
 
 
+
+const drive = google.drive({ version: "v3", auth });
+
+
+
+export async function uploadFileToDriveFromPath(localFilePath) {
+
+  const fileName = localFilePath.split("/").pop();
 
   const res = await drive.files.create({
 
     requestBody: {
 
-      name: originalName,
+      name: fileName,
 
-      parents: DRIVE_FOLDER_ID ? [DRIVE_FOLDER_ID] : undefined
+      parents: process.env.GOOGLE_DRIVE_FOLDER_ID ? [process.env.GOOGLE_DRIVE_FOLDER_ID] : undefined,
 
     },
 
     media: {
 
-      mimeType: mimeType || "application/octet-stream",
-
-      body: fs.createReadStream(localFilePath)
+      body: fs.createReadStream(localFilePath),
 
     },
 
-    fields: "id, name, mimeType, size, webViewLink"
+    fields: "id, name, webViewLink"
 
   });
-
-
 
   return res.data;
 
 }
+
+
+
+
+
+
 
