@@ -7,11 +7,70 @@ import dotenv from "dotenv";
 import fetch from "node-fetch"; // or native fetch in Node 18+
 import crypto from "crypto";
 import { uploadFileToDriveFromPath } from "./drive.js";
+import { google } from "googleapis";
 
 dotenv.config();
 
 const app = express();
 
+
+
+
+
+function getCredsFromEnvOrFile() {
+
+  let creds;
+
+
+
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+
+    try {
+
+      creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+
+    } catch (err) {
+
+      console.error("Invalid GOOGLE_CREDENTIALS_JSON:", err);
+
+      throw new Error("Failed to parse GOOGLE_CREDENTIALS_JSON env");
+
+    }
+
+  } else {
+
+    try {
+
+      creds = JSON.parse(fs.readFileSync("service-account.json", "utf-8"));
+
+    } catch (err) {
+
+      throw new Error("Google service account JSON not found in env or path");
+
+    }
+
+  }
+
+
+
+  return creds;
+
+}
+const credentials = getCredsFromEnvOrFile();
+
+
+
+const auth = new google.auth.GoogleAuth({
+
+  credentials,
+
+  scopes: ["https://www.googleapis.com/auth/drive.file"],
+
+});
+
+
+
+export default auth;
 // Middleware
 app.use(cors({
   origin: "*",  // For now, allows all origins (adjust for production)
