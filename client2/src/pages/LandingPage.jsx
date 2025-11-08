@@ -116,7 +116,7 @@ export default function LandingPage() {
 
 
 
-      <footer className="absolute bottom-5 text-sm text-gray-200/80">© {new Date().getFullYear()} AutoFixer</footer>
+     <footer className="w-full text-center text-sm text-gray-300 mt-auto py-4 fixed bottom-0 left-0 bg-transparent">© {new Date().getFullYear()} AutoFixer</footer>
 
     </div>
 

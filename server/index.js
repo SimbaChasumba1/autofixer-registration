@@ -2,27 +2,25 @@ import express from "express";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
-import fetch from "node-fetch"; // Or native fetch in Node 18+
-import { uploadFileToDriveFromBuffer } from "./drive.js"; // Updated for buffer upload
+import fetch from "node-fetch";
+import { uploadFileToDriveFromBuffer } from "./drive.js";  // Assuming this is your Google Drive logic
+import paypalRoutes from "./paypal.js";  // PayPal routes
 
 dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(cors({
-  origin: "*",  // For now, allows all origins (adjust for production)
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
-app.use(express.json({
-  verify: (req, res, buf) => { req.rawBody = buf; }
-}));
+// Middleware setup
+app.use(cors());
+app.use(express.json());  // Parse incoming JSON requests
 
-// REGISTRATION FILE (in-memory storage for simplicity)
+// Use PayPal routes (only PayPal-related routes)
+app.use("/paypal", paypalRoutes);  // All PayPal-related routes will be prefixed with `/paypal`
+
+// Google Drive upload and registration routes
 const registrations = [];
 
-// 1) Create a pending registration
+// Route for creating a pending registration and uploading video to Google Drive
 app.post("/api/create-pending", multer().single("video"), async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -61,49 +59,7 @@ app.post("/api/create-pending", multer().single("video"), async (req, res) => {
   }
 });
 
-// 2) Create Paystack transaction (same as before)
-app.post("/api/create-paystack-transaction", async (req, res) => {
-  try {
-    const { registrationId } = req.body;
-    if (!registrationId) return res.status(400).json({ error: "Missing registrationId" });
-
-    const reg = registrations.find(r => r.id === registrationId);
-    if (!reg) return res.status(404).json({ error: "Registration not found" });
-
-    const payload = {
-      email: reg.email,
-      amount: 2000,  // Example amount
-      metadata: { registrationId }
-    };
-
-    const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const initJson = await initRes.json();
-    if (!initJson.status) {
-      console.error("Paystack init failed:", initJson);
-      return res.status(500).json({ error: "Paystack initialization failed" });
-    }
-
-    reg.paystackReference = initJson.data.reference || null;
-
-    res.json({
-      authorization_url: initJson.data.authorization_url,
-      reference: initJson.data.reference
-    });
-  } catch (err) {
-    console.error("Error initializing Paystack transaction:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// Health check endpoint
+// Health check endpoint (for server health check)
 app.get("/health", (req, res) => res.json({ ok: true }));
 
 const port = process.env.PORT || 5000;

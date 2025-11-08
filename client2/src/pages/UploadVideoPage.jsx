@@ -17,12 +17,13 @@ export default function UploadVideoPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Form validation
     if (!form.name || !form.email || !form.phone) {
-      return alert("Please fill all fields");
+      return alert("Please fill all fields.");
     }
 
     if (!video) {
-      return alert("Please select a video to upload");
+      return alert("Please select a video to upload.");
     }
 
     setLoading(true);
@@ -45,27 +46,24 @@ export default function UploadVideoPage() {
 
       const registrationId = json.id;
 
-      // 2️⃣ Initialize Paystack transaction
-      const initRes = await fetch(`${API}/api/create-paystack-transaction`, {
+      // 2️⃣ Initialize PayPal transaction
+      const createOrderRes = await fetch(`${API}/api/create-paypal-order`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",  // Set content type
-        },
-        body: JSON.stringify({ registrationId }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 20 }), // Make sure the amount is dynamic if needed
       });
 
-      const initJson = await initRes.json();
+      const orderData = await createOrderRes.json();
 
-      if (!initRes.ok) {
-        throw new Error(initJson.error || initJson.msg || "Paystack init failed");
-      }
+      if (!createOrderRes.ok) throw new Error(orderData.error || "PayPal init failed");
 
-      // 3️⃣ Redirect to Paystack payment page
-      window.location.href = initJson.authorization_url;
-    } catch (err) {
-      console.error(err);
-      alert("Error: " + (err.message || "Something went wrong"));
-      setLoading(false);
+      // Redirect to PayPal checkout
+      window.location.href = `https://www.sandbox.paypal.com/checkoutnow?token=${orderData.id}`;
+
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setLoading(false); // Reset loading state even if there's an error
     }
   };
 
