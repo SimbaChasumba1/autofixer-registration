@@ -1,21 +1,25 @@
 import express from "express";
-import paypal from "@paypal/checkout-server-sdk";  // PayPal Checkout SDK
+import paypal from "@paypal/paypal-server-sdk";
+import dotenv from "dotenv";
 
-// Environment setup
-const environment = new paypal.core.LiveEnvironment(
-  process.env.PAYPAL_CLIENT_ID,
-  process.env.PAYPAL_CLIENT_SECRET
-);
+// Load environment variables
+dotenv.config();
 
-// For testing, use: paypal.core.SandboxEnvironment() instead of LiveEnvironment
-// const environment = new paypal.core.SandboxEnvironment(
-//   process.env.PAYPAL_CLIENT_ID,
-//   process.env.PAYPAL_CLIENT_SECRET
-// );
+// Set up the PayPal environment (use LiveEnvironment for production or SandboxEnvironment for testing)
+const environment = process.env.PAYPAL_ENV === 'production'
+  ? new paypal.core.LiveEnvironment(
+      process.env.PAYPAL_CLIENT_ID,
+      process.env.PAYPAL_SECRET
+    )
+  : new paypal.core.SandboxEnvironment(
+      process.env.PAYPAL_CLIENT_ID,
+      process.env.PAYPAL_SECRET
+    );
 
+// Initialize the PayPal client
 const client = new paypal.core.PayPalHttpClient(environment);
 
-// Initialize the router
+// Initialize the Express router
 const router = express.Router();
 
 // Route for creating a PayPal order
@@ -28,8 +32,8 @@ router.post("/create-paypal-order", async (req, res) => {
       purchase_units: [
         {
           amount: {
-            currency_code: "USD",  // Or dynamically set this
-            value: req.body.amount || "1.00", // Use the amount sent in the request, or default to 1.00
+            currency_code: "USD",  // You can dynamically change this as needed
+            value: req.body.amount || "1.00", // Use the amount passed in the request, or default to 1.00
           },
         },
       ],
@@ -46,5 +50,5 @@ router.post("/create-paypal-order", async (req, res) => {
   }
 });
 
-// Export the router
+// Export the router to be used in your main server file
 export default router;
