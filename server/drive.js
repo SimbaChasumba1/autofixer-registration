@@ -1,9 +1,11 @@
 import { google } from "googleapis";
 import fs from "fs";
 import dotenv from "dotenv";
+import stream from "stream";  // Import stream to handle buffer streams
 
 dotenv.config();
 
+// Get credentials from environment variables or from a file
 function getCredsFromEnvOrFile() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT) {
     return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);  // Read from env
@@ -17,27 +19,43 @@ function getCredsFromEnvOrFile() {
   throw new Error("Google service account JSON not found in env or path");
 }
 
+// Get credentials
 const creds = getCredsFromEnvOrFile();
 
+// Set up the Google Auth client with credentials
 const auth = new google.auth.GoogleAuth({
   credentials: creds,
-  scopes: ["https://www.googleapis.com/auth/drive.file"]
+  scopes: ["https://www.googleapis.com/auth/drive.file"],
 });
 
+// Google Drive client
 const drive = google.drive({ version: "v3", auth });
 
-// Upload file directly from buffer (for serverless environments)
-export async function uploadFileToDriveFromBuffer(fileBuffer, fileName) {
-  const res = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      parents: process.env.GOOGLE_DRIVE_FOLDER_ID ? [process.env.GOOGLE_DRIVE_FOLDER_ID] : undefined,
-    },
-    media: {
-      body: fileBuffer,  // File buffer directly passed
-    },
-    fields: "id, name, webViewLink"
-  });
+// Function to upload file to Google Drive from a buffer
+export async function uploadFileToDriveFromBuffer(buffer, fileName, mimeType) {
+  const bufferStream = new stream.PassThrough();
+  bufferStream.end(buffer);  // End the stream with the provided buffer
 
-  return res.data;
+  const fileMetadata = {
+    name: fileName,  // Set the file name
+  };
+
+  const media = {
+    mimeType,  // Mime type for the file
+    body: bufferStream,  // Stream the buffer data
+  };
+
+  try {
+    // Upload the file to Google Drive
+    const response = await drive.files.create({
+      resource: fileMetadata,
+      media,
+      fields: "id, webViewLink",  // We want to return file ID and web view link
+    });
+
+    return response.data;  // Return file details including ID and web view link
+  } catch (err) {
+    console.error("Error uploading file to Google Drive:", err);
+    throw new Error("Failed to upload file to Google Drive");
+  }
 }

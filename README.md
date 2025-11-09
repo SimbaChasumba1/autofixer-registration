@@ -49,8 +49,21 @@ git clone https://github.com/SimbaChasumba1/autofixer-registration.git
 cd autofixer-registration
 npm install
 =======
-# autofixer-registration
-One-page web app built for Auto-Fixer startup to allow users to register with email, upload a short promotional video via Google Drive API and pay a registration fee of R20 to support the app launch. Built with React, Node.js, Tailwind CSS, and MongoDB.
+# Auto-Fixer Registration
+
+One-page web app for the Auto-Fixer startup that allows users to:
+
+- Register with their email  
+
+- Upload a short promotional video via Google Drive API  
+
+- Pay a small registration fee (R20) to support the app launch  
+
+
+
+Built with **React**, **Node.js**, and **Tailwind CSS**.
+
+
 >>>>>>> d36ca613a3e77a77e59292e17136d8322bf54038
 
 
