@@ -5,7 +5,7 @@ import stream from "stream";  // Import stream to handle buffer streams
 
 dotenv.config();
 
-// Get credentials from environment variables or from a file
+// Function to get credentials from environment variables or a file
 function getCredsFromEnvOrFile() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT) {
     return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);  // Read from env
@@ -19,19 +19,19 @@ function getCredsFromEnvOrFile() {
   throw new Error("Google service account JSON not found in env or path");
 }
 
-// Get credentials
+// Get credentials for Google service account
 const creds = getCredsFromEnvOrFile();
 
-// Set up the Google Auth client with credentials
+// Set up the Google Auth client with the service account credentials
 const auth = new google.auth.GoogleAuth({
   credentials: creds,
-  scopes: ["https://www.googleapis.com/auth/drive.file"],
+  scopes: ["https://www.googleapis.com/auth/drive.file"],  // The Drive API scope
 });
 
 // Google Drive client
 const drive = google.drive({ version: "v3", auth });
 
-// Function to upload file to Google Drive from a buffer
+// Function to upload file directly from buffer (for serverless environments)
 export async function uploadFileToDriveFromBuffer(buffer, fileName, mimeType) {
   const bufferStream = new stream.PassThrough();
   bufferStream.end(buffer);  // End the stream with the provided buffer
