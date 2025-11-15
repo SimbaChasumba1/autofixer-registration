@@ -32,8 +32,6 @@ export default function App() {
 
         <Route path="/upload-video" element={<UploadVideoPage />} />
 
-        <Route path="/payment" element={<PaymentPage />} />
-
         <Route path="/success" element={<SuccessPage />} />
 
         <Route path="*" element={<NotFound />} />
