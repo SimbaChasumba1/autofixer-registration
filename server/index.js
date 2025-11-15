@@ -2,8 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { uploadVideo } from './supabase.js';
-import fetch from 'node-fetch'; // or global fetch if Node 18+
+import { uploadVideo, supabase } from './supabase.js';
+import fetch from 'node-fetch';
 
 dotenv.config();
 
@@ -28,9 +28,20 @@ app.post('/api/create-pending', uploads.single('video'), async (req, res) => {
     // Upload video to Supabase
     const videoUrl = await uploadVideo(buffer, `${Date.now()}-${originalname}`, mimetype);
 
-    // Store registration
+    // Save user to Supabase
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .insert([{ name, email, phone }])
+      .select()
+      .single();
+
+    if (userError) {
+      console.error(userError);
+      return res.status(500).json({ error: 'Error saving user' });
+    }
+
     const id = Date.now().toString();
-    const registration = { id, name, email, phone, videoUrl, paid: false };
+    const registration = { id, name, email, phone, videoUrl, paid: false, userId: userData.id };
     registrations.push(registration);
 
     res.json({ id, registration });
@@ -44,7 +55,7 @@ app.post('/api/create-pending', uploads.single('video'), async (req, res) => {
 app.post('/api/create-paypal-order', async (req, res) => {
   try {
     const { amount } = req.body;
-    const PAYPAL_CLIENT = process.env.PAYPAL_CLIENT;
+    const PAYPAL_CLIENT = process.env.PAYPAL_CLIENT_ID;
     const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 
     const auth = Buffer.from(`${PAYPAL_CLIENT}:${PAYPAL_SECRET}`).toString('base64');
