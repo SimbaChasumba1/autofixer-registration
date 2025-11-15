@@ -7,6 +7,7 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.81.1",
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -14,8 +15,7 @@
     "multer": "^2.0.0",
     "ngrok": "^5.0.0-beta.2",
     "node-fetch": "^3.3.2",
-    "qs": "^6.11.0",
-    "@supabase/supabase-js": "^2.32.0"
+    "qs": "^6.11.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
