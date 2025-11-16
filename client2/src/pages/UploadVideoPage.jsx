@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function UploadVideoPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(false);
   const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';  // API URL
+  const navigate = useNavigate();
 
   const handleFile = (e) => setVideo(e.target.files?.[0] ?? null);
 
@@ -44,19 +46,24 @@ export default function UploadVideoPage() {
       const createOrderRes = await fetch(`${API}/api/create-paypal-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 20 }), // You can adjust the amount dynamically
+        body: JSON.stringify({ amount: 20 }), // Adjust the amount dynamically
       });
 
       const orderData = await createOrderRes.json();
       if (!createOrderRes.ok) throw new Error(orderData.error || "PayPal init failed");
 
-      // Redirect to PayPal checkout
-      if (orderData.approvalLink) {
-        window.location.href = orderData.approvalLink;  // Redirect to PayPal for payment
+      // 3️⃣ Redirect to PayPal for payment
+      if (orderData.links) {
+        const approvalLink = orderData.links.find(link => link.rel === 'approve');
+        if (approvalLink) {
+          // After redirecting to PayPal, send the orderId and registrationId to the SuccessPage
+          navigate('/success', { state: { orderId: orderData.id, registrationId } });
+        } else {
+          throw new Error("PayPal approval link not found.");
+        }
       } else {
-        throw new Error("PayPal approval link not found.");
+        throw new Error("PayPal approval link missing in response.");
       }
-
     } catch (error) {
       alert(`Error: ${error.message}`);
     } finally {

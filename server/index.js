@@ -4,19 +4,55 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { uploadVideo } from "./supabase.js"; 
 import fetch from "node-fetch";
+import nodeCron from "node-cron";
 
 dotenv.config();
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const uploads = multer();
-
-// Temporary in-memory storage for registrations
 const registrations = [];
 
-// Upload & create pending registration
+let paypalAccessToken = null;
+let tokenExpiryTime = 0;
+const PAYPAL_API_URL = process.env.PAYPAL_API_URL || 'https://api-m.paypal.com';
+const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const SECRET = process.env.PAYPAL_SECRET;
+
+// Function to refresh PayPal token
+async function refreshPayPalToken() {
+  const auth = Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64');
+  try {
+    const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    });
+    
+    const data = await response.json();
+    if (data.error) {
+      throw new Error('Failed to get new PayPal token');
+    }
+    
+    paypalAccessToken = data.access_token;
+    tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set the expiration time
+    console.log('PayPal token refreshed successfully');
+  } catch (error) {
+    console.error('Error refreshing PayPal token:', error);
+  }
+}
+
+// Automatically refresh the token every 8 hours
+nodeCron.schedule('0 */8 * * *', refreshPayPalToken);
+
+// Initial token refresh when the app starts
+refreshPayPalToken();
+
+// Create pending registration endpoint
 app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
   try {
     const { name, email, phone } = req.body;
@@ -24,11 +60,8 @@ app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "Video required" });
 
     const { buffer, originalname, mimetype } = req.file;
-
-    // Upload video to Supabase
     const videoUrl = await uploadVideo(buffer, `${Date.now()}-${originalname}`, mimetype);
 
-    // Store registration
     const id = Date.now().toString();
     const registration = { id, name, email, phone, videoUrl, paid: false };
     registrations.push(registration);
@@ -42,56 +75,37 @@ app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
 
 // Create PayPal order
 app.post("/api/create-paypal-order", async (req, res) => {
+  const { amount } = req.body;
+
   try {
-    const { amount } = req.body;
-    const PAYPAL_CLIENT = process.env.PAYPAL_CLIENT_ID;
-    const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
-
-    // Base64 encode the client ID and secret for the Authorization header
-    const auth = Buffer.from(`${PAYPAL_CLIENT}:${PAYPAL_SECRET}`).toString("base64");
-
-    // Get token from PayPal OAuth2
-    const tokenRes = await fetch("https://api-m.paypal.com/v1/oauth2/token", {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: "grant_type=client_credentials",  // OAuth2 grant type
-    });
-
-    const tokenData = await tokenRes.json();
-
-    // Log token response for debugging
-    console.log("PayPal token response:", tokenData);
-
-    // If PayPal responds with an error, log and send it back
-    if (tokenData.error) {
-      console.error("Error getting PayPal token:", tokenData);
-      return res.status(500).json({ error: "Error getting PayPal token", details: tokenData });
+    if (!paypalAccessToken) {
+      return res.status(500).json({ error: "PayPal token is not available" });
     }
 
-    // Create order with PayPal
-    const orderRes = await fetch("https://api-m.paypal.com/v2/checkout/orders", {
+    const orderRes = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
+        Authorization: `Bearer ${paypalAccessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         intent: "CAPTURE",
         purchase_units: [
           {
-            amount: { currency_code: "USD", value: amount },
+            amount: {
+              currency_code: "USD",
+              value: amount,
+            },
           },
         ],
       }),
     });
 
     const orderData = await orderRes.json();
-
-    // Log order creation response for debugging
-    console.log("PayPal order response:", orderData);
+    if (!orderRes.ok) {
+      console.error('PayPal order creation failed:', orderData);
+      return res.status(500).json({ error: "PayPal order creation failed", details: orderData });
+    }
 
     res.json(orderData);
   } catch (err) {
@@ -100,6 +114,27 @@ app.post("/api/create-paypal-order", async (req, res) => {
   }
 });
 
+// Payment status update
+app.post("/api/paypal-payment-status", async (req, res) => {
+  const { orderId } = req.body;
+  try {
+    const orderRes = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders/${orderId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${paypalAccessToken}`,
+      },
+    });
+
+    const orderData = await orderRes.json();
+    if (orderData.status === 'COMPLETED') {
+      res.json({ success: true, message: "Payment successful" });
+    } else {
+      res.json({ success: false, message: "Payment not completed" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Error checking payment status", details: err });
+  }
+});
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Server running on ${port}`));

@@ -1,58 +1,80 @@
-import paypal from 'paypal-rest-sdk'; // Import paypal-rest-sdk
+const fetch = require('node-fetch');
+const dotenv = require('dotenv');
+dotenv.config();
 
-console.log('PayPal Client ID:', process.env.PAYPAL_CLIENT_ID);
-console.log('PayPal Secret:', process.env.PAYPAL_SECRET);
+let paypalAccessToken = null;
+let tokenExpiryTime = 0;
 
-// Set up the PayPal environment with your credentials
-paypal.configure({
-  mode: 'live', // Change to 'sandbox' for testing
-  client_id: process.env.PAYPAL_CLIENT_ID,
-  client_secret: process.env.PAYPAL_SECRET,
-});
+const PAYPAL_API_URL = process.env.PAYPAL_API_URL;
+const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const SECRET = process.env.PAYPAL_SECRET;
 
-// Initialize the router (if you're using Express for routing)
-import express from 'express';
-const router = express.Router();
+// Function to refresh PayPal token
+async function refreshPayPalToken() {
+    const auth = Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64');
 
-// Route for creating a PayPal order
-router.post("/create-paypal-order", async (req, res) => {
-  try {
-    const paymentData = {
-      intent: "sale",
-      payer: {
-        payment_method: "paypal",
-      },
-      transactions: [
-        {
-          amount: {
-            currency: "USD",  // Or dynamically set this
-            total: req.body.amount || "1.00", // Use the amount sent in the request, or default to 1.00
-          },
-          description: "Payment for order",
-        },
-      ],
-      redirect_urls: {
-        return_url: "http://localhost:5000/paypal/success",
-        cancel_url: "http://localhost:5000/paypal/cancel",
-      },
-    };
+    try {
+        const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${auth}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'grant_type=client_credentials',
+        });
 
-    // Create the PayPal payment
-    paypal.payment.create(paymentData, function (error, payment) {
-      if (error) {
-        console.error("Error creating PayPal payment:", error);
-        res.status(500).send("Error creating PayPal order");
-      } else {
-        // Redirect the user to the PayPal approval URL
-        const approvalUrl = payment.links.find(link => link.rel === "approval_url").href;
-        res.json({ approvalUrl });
-      }
-    });
-  } catch (err) {
-    console.error("Error creating PayPal order:", err);
-    res.status(500).send("Error creating PayPal order");
-  }
-});
+        const data = await response.json();
 
-// Export the router so you can use it in your Express app
-export default router;
+        if (data.error) {
+            throw new Error('Failed to get new PayPal token');
+        }
+
+        paypalAccessToken = data.access_token;
+        tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set the new expiration time
+        console.log('PayPal token refreshed successfully');
+    } catch (error) {
+        console.error('Error refreshing PayPal token:', error);
+    }
+}
+
+// Function to check and get a valid PayPal token
+async function getPayPalAccessToken() {
+    if (Date.now() >= tokenExpiryTime) {
+        await refreshPayPalToken(); // Refresh token if expired
+    }
+    return paypalAccessToken;
+}
+
+// Example API call to create a PayPal order
+async function createPayPalOrder() {
+    const token = await getPayPalAccessToken();
+    
+    try {
+        const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                intent: 'CAPTURE',
+                purchase_units: [
+                    {
+                        amount: {
+                            currency_code: 'USD',
+                            value: '10.00',
+                        },
+                    },
+                ],
+            }),
+        });
+
+        const data = await response.json();
+        console.log('PayPal Order Created:', data);
+    } catch (error) {
+        console.error('Error creating PayPal order:', error);
+    }
+}
+
+// Export functions so you can use them in your main app
+module.exports = { createPayPalOrder, getPayPalAccessToken };
