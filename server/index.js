@@ -1,9 +1,9 @@
-import express from 'express';
-import multer from 'multer';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { uploadVideo } from './supabase.js';
-import fetch from 'node-fetch'; 
+import express from "express";
+import multer from "multer";
+import cors from "cors";
+import dotenv from "dotenv";
+import { uploadVideo } from "./supabase.js"; 
+import fetch from "node-fetch";
 
 dotenv.config();
 
@@ -17,11 +17,11 @@ const uploads = multer();
 const registrations = [];
 
 // Upload & create pending registration
-app.post('/api/create-pending', uploads.single('video'), async (req, res) => {
+app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
   try {
     const { name, email, phone } = req.body;
-    if (!name || !email || !phone) return res.status(400).json({ error: 'Missing fields' });
-    if (!req.file) return res.status(400).json({ error: 'Video required' });
+    if (!name || !email || !phone) return res.status(400).json({ error: "Missing fields" });
+    if (!req.file) return res.status(400).json({ error: "Video required" });
 
     const { buffer, originalname, mimetype } = req.file;
 
@@ -36,43 +36,42 @@ app.post('/api/create-pending', uploads.single('video'), async (req, res) => {
     res.json({ id, registration });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 // Create PayPal order
-app.post('/api/create-paypal-order', async (req, res) => {
+app.post("/api/create-paypal-order", async (req, res) => {
   try {
     const { amount } = req.body;
-    const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+    const PAYPAL_CLIENT = process.env.PAYPAL_CLIENT_ID;
     const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 
-    if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
-      return res.status(400).json({ error: "Missing PayPal credentials" });
-    }
+    // Base64 encode the client ID and secret for the Authorization header
+    const auth = Buffer.from(`${PAYPAL_CLIENT}:${PAYPAL_SECRET}`).toString("base64");
 
-    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64");
-    console.log("Authorization Header:", `Basic ${auth}`);
-
-
-    // LIVE PayPal token URL
+    // Get token from PayPal OAuth2
     const tokenRes = await fetch("https://api-m.paypal.com/v1/oauth2/token", {
       method: "POST",
       headers: {
         Authorization: `Basic ${auth}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: "grant_type=client_credentials",
+      body: "grant_type=client_credentials",  // OAuth2 grant type
     });
 
     const tokenData = await tokenRes.json();
 
-    if (!tokenRes.ok) {
+    // Log token response for debugging
+    console.log("PayPal token response:", tokenData);
+
+    // If PayPal responds with an error, log and send it back
+    if (tokenData.error) {
       console.error("Error getting PayPal token:", tokenData);
       return res.status(500).json({ error: "Error getting PayPal token", details: tokenData });
     }
 
-    // Create order
+    // Create order with PayPal
     const orderRes = await fetch("https://api-m.paypal.com/v2/checkout/orders", {
       method: "POST",
       headers: {
@@ -83,10 +82,7 @@ app.post('/api/create-paypal-order', async (req, res) => {
         intent: "CAPTURE",
         purchase_units: [
           {
-            amount: {
-              currency_code: "USD",
-              value: amount,
-            },
+            amount: { currency_code: "USD", value: amount },
           },
         ],
       }),
@@ -94,18 +90,16 @@ app.post('/api/create-paypal-order', async (req, res) => {
 
     const orderData = await orderRes.json();
 
-    if (!orderRes.ok) {
-      console.error("PayPal order creation error:", orderData);
-      return res.status(500).json({ error: "PayPal order creation failed", details: orderData });
-    }
+    // Log order creation response for debugging
+    console.log("PayPal order response:", orderData);
 
     res.json(orderData);
-
   } catch (err) {
-    console.error("PayPal error:", err);
-    res.status(500).json({ error: "PayPal error", details: err.message });
+    console.error("PayPal order error:", err);
+    res.status(500).json({ error: "PayPal error", details: err });
   }
 });
+
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Server running on ${port}`));
