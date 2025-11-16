@@ -1,53 +1,66 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
 export default function UploadVideoPage() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:4041';
-
-  useEffect(() => {
-    const savedForm = sessionStorage.getItem('autofixer_form');
-    if (savedForm) setForm(JSON.parse(savedForm));
-  }, []);
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';  // API URL
 
   const handleFile = (e) => setVideo(e.target.files?.[0] ?? null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.phone) return alert('Fill all fields');
-    if (!video) return alert('Select a video');
+
+    // Form validation
+    if (!form.name || !form.email || !form.phone) {
+      return alert("Please fill all fields.");
+    }
+
+    if (!video) {
+      return alert("Please select a video to upload.");
+    }
 
     setLoading(true);
 
     try {
+      // 1️⃣ Send form + video to backend
       const fd = new FormData();
-      fd.append('name', form.name);
-      fd.append('email', form.email);
-      fd.append('phone', form.phone);
-      fd.append('video', video);
+      fd.append("name", form.name);
+      fd.append("email", form.email);
+      fd.append("phone", form.phone);
+      fd.append("video", video);
 
-      // Upload & create pending
-      const res = await fetch(`${API}/api/create-pending`, { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
-
-      // PayPal
-      const orderRes = await fetch(`${API}/api/create-paypal-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: '20.00' })
+      const res = await fetch(`${API}/api/create-pending`, {
+        method: "POST",
+        body: fd,
       });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error);
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Create pending failed");
+
+      const registrationId = json.id;
+
+      // 2️⃣ Initialize PayPal transaction
+      const createOrderRes = await fetch(`${API}/api/create-paypal-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 20 }), // You can adjust the amount dynamically
+      });
+
+      const orderData = await createOrderRes.json();
+      if (!createOrderRes.ok) throw new Error(orderData.error || "PayPal init failed");
 
       // Redirect to PayPal checkout
-      window.location.href = `https://www.paypal.com/checkoutnow?token=${orderData.id}`;
-    } catch (err) {
-      alert(err.message);
+      if (orderData.approvalLink) {
+        window.location.href = orderData.approvalLink;  // Redirect to PayPal for payment
+      } else {
+        throw new Error("PayPal approval link not found.");
+      }
+
+    } catch (error) {
+      alert(`Error: ${error.message}`);
     } finally {
-      setLoading(false);
+      setLoading(false); // Reset loading state even if there's an error
     }
   };
 
@@ -55,14 +68,48 @@ export default function UploadVideoPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-blue-600 to-cyan-500 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <h2 className="text-2xl font-bold mb-4 text-center">Register & Upload Promo Video</h2>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" className="w-full border p-3 rounded-lg" required />
-          <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email" type="email" className="w-full border p-3 rounded-lg" required />
-          <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Phone" className="w-full border p-3 rounded-lg" required />
-          <input type="file" accept="video/*" onChange={handleFile} className="w-full border p-3 rounded-lg" />
-          <p className="text-sm text-gray-500">Video upload is temporary until payment is verified.</p>
-          <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg" disabled={loading}>
-            {loading ? 'Processing...' : 'Pay $20 & Register'}
+          <input
+            name="name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Full name"
+            className="w-full border p-3 rounded-lg"
+            required
+          />
+          <input
+            name="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="Email address"
+            type="email"
+            className="w-full border p-3 rounded-lg"
+            required
+          />
+          <input
+            name="phone"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            placeholder="Phone number"
+            className="w-full border p-3 rounded-lg"
+            required
+          />
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleFile}
+            className="w-full border p-3 rounded-lg"
+          />
+          <p className="text-sm text-gray-500">
+            Video upload is temporary until payment is verified.
+          </p>
+          <button
+            type="submit"
+            className="w-full bg-indigo-600 text-white py-3 rounded-lg"
+            disabled={loading}
+          >
+            {loading ? "Processing..." : "Pay R20 & Register"}
           </button>
         </form>
       </div>

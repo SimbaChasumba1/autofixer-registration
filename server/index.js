@@ -2,8 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { uploadVideo, supabase } from './supabase.js';
-import fetch from 'node-fetch';
+import { uploadVideo } from './supabase.js';  // Assuming uploadVideo function is set up properly
+import fetch from 'node-fetch';  // or global fetch if Node 18+
 
 dotenv.config();
 
@@ -28,25 +28,14 @@ app.post('/api/create-pending', uploads.single('video'), async (req, res) => {
     // Upload video to Supabase
     const videoUrl = await uploadVideo(buffer, `${Date.now()}-${originalname}`, mimetype);
 
-    // Save user to Supabase
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .insert([{ name, email, phone }])
-      .select()
-      .single();
-
-    if (userError) {
-      console.error(userError);
-      return res.status(500).json({ error: 'Error saving user' });
-    }
-
+    // Store registration
     const id = Date.now().toString();
-    const registration = { id, name, email, phone, videoUrl, paid: false, userId: userData.id };
+    const registration = { id, name, email, phone, videoUrl, paid: false };
     registrations.push(registration);
 
     res.json({ id, registration });
   } catch (err) {
-    console.error(err);
+    console.error('Error during registration:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -59,17 +48,28 @@ app.post('/api/create-paypal-order', async (req, res) => {
     const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 
     const auth = Buffer.from(`${PAYPAL_CLIENT}:${PAYPAL_SECRET}`).toString('base64');
+    
+    // Set PayPal API URL based on environment
+    const paypalUrl = process.env.PAYPAL_ENV === 'live' 
+      ? 'https://api-m.paypal.com' 
+      : 'https://api-m.sandbox.paypal.com';
 
     // Get token
-    const tokenRes = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
+    const tokenRes = await fetch(`${paypalUrl}/v1/oauth2/token`, {
       method: 'POST',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'grant_type=client_credentials'
     });
+
     const tokenData = await tokenRes.json();
 
+    if (!tokenRes.ok) {
+      console.error('Error getting PayPal token:', tokenData);
+      return res.status(500).json({ error: 'Failed to get PayPal token' });
+    }
+
     // Create order
-    const orderRes = await fetch('https://api-m.paypal.com/v2/checkout/orders', {
+    const orderRes = await fetch(`${paypalUrl}/v2/checkout/orders`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
@@ -77,14 +77,23 @@ app.post('/api/create-paypal-order', async (req, res) => {
       },
       body: JSON.stringify({
         intent: 'CAPTURE',
-        purchase_units: [{ amount: { currency_code: 'USD', value: amount } }]
+        purchase_units: [{ amount: { currency_code: 'USD', value: amount.toString() } }]
       })
     });
 
     const orderData = await orderRes.json();
-    res.json(orderData);
+    console.log('PayPal Order Data:', orderData);  // Debug logging
+
+    if (!orderRes.ok) {
+      console.error('Error creating PayPal order:', orderData);
+      return res.status(500).json({ error: 'Failed to create PayPal order' });
+    }
+
+    // Send PayPal approval link to frontend
+    const approvalLink = orderData.links.find(link => link.rel === 'approve').href;
+    res.json({ approvalLink });
   } catch (err) {
-    console.error(err);
+    console.error('PayPal Order Error:', err);
     res.status(500).json({ error: 'PayPal error' });
   }
 });
