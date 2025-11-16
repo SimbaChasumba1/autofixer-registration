@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 const uploads = multer();
-const registrations = [];
+const registrations = []; 
 
 let paypalAccessToken = null;
 let tokenExpiryTime = 0;
@@ -32,12 +32,12 @@ async function refreshPayPalToken() {
       },
       body: 'grant_type=client_credentials',
     });
-    
+
     const data = await response.json();
     if (data.error) {
       throw new Error('Failed to get new PayPal token');
     }
-    
+
     paypalAccessToken = data.access_token;
     tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set the expiration time
     console.log('PayPal token refreshed successfully');
@@ -116,8 +116,15 @@ app.post("/api/create-paypal-order", async (req, res) => {
 
 // Payment status update
 app.post("/api/paypal-payment-status", async (req, res) => {
-  const { orderId } = req.body;
+  const { orderId, registrationId } = req.body; // Expect both orderId and registrationId
+
   try {
+    // Find the registration based on the provided registrationId
+    const registration = registrations.find(reg => reg.id === registrationId);
+    if (!registration) {
+      return res.status(404).json({ error: "Registration not found" });
+    }
+
     const orderRes = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders/${orderId}`, {
       method: "GET",
       headers: {
@@ -126,12 +133,20 @@ app.post("/api/paypal-payment-status", async (req, res) => {
     });
 
     const orderData = await orderRes.json();
+
     if (orderData.status === 'COMPLETED') {
-      res.json({ success: true, message: "Payment successful" });
+      // Update the registration payment status
+      registration.paid = true;
+      
+      // Here you can also update registration details in a database if needed
+      // For example, adding the video link or any other info you want to attach
+      
+      res.json({ success: true, message: "Payment successful", registration });
     } else {
       res.json({ success: false, message: "Payment not completed" });
     }
   } catch (err) {
+    console.error("Error checking PayPal payment status:", err);
     res.status(500).json({ error: "Error checking payment status", details: err });
   }
 });

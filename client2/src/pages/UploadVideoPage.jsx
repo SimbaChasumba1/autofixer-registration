@@ -56,8 +56,10 @@ export default function UploadVideoPage() {
       if (orderData.links) {
         const approvalLink = orderData.links.find(link => link.rel === 'approve');
         if (approvalLink) {
-          // After redirecting to PayPal, send the orderId and registrationId to the SuccessPage
+          // Store the orderId and registrationId in the state before redirecting
           navigate('/success', { state: { orderId: orderData.id, registrationId } });
+          // Redirect to the PayPal approval page
+          window.location.href = approvalLink.href;  // User is redirected to PayPal
         } else {
           throw new Error("PayPal approval link not found.");
         }

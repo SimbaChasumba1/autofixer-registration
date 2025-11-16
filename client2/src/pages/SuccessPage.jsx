@@ -4,36 +4,37 @@ import { useSearchParams } from "react-router-dom";
 
 export default function SuccessPage() {
   const [searchParams] = useSearchParams();
-  const ref = searchParams.get("reference"); // Paystack reference
+  const orderId = searchParams.get("orderId"); // PayPal order ID
+  const registrationId = searchParams.get("registrationId"); // registration ID passed from UploadVideoPage
   const [msg, setMsg] = useState("Completing...");
   const [videoLink, setVideoLink] = useState(null);
 
   useEffect(() => {
-    if (!ref) {
-      setMsg("Payment completed — thanks! We'll email you a confirmation.");
+    if (!orderId || !registrationId) {
+      setMsg("Payment failed or missing details.");
       return;
     }
 
-    // Fetch registration/payment status from backend
+    // Fetch payment status from your backend
     const fetchStatus = async () => {
       try {
-        const res = await fetch(
-          `https://bunny-explainable-michaela.ngrok-free.dev/api/paystack/verify/${ref}`
-        );
+        const res = await fetch(`http://localhost:5000/api/paypal-payment-status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, registrationId })
+        });
+
         const data = await res.json();
 
-        if (data.status === "success") {
-          setMsg(
-            `Payment successful! Reference: ${ref} — We'll confirm your video shortly.`
-          );
-
-          if (data.registration.driveWebView) {
+        if (res.ok && data.status === "COMPLETED") {
+          setMsg(`Payment successful! Order ID: ${orderId}. We’ll confirm your video shortly.`);
+          if (data.registration?.driveWebView) {
             setVideoLink(data.registration.driveWebView);
           }
-        } else if (data.status === "pending") {
-          setMsg(`Payment is pending. Reference: ${ref}`);
+        } else if (data.status === "PENDING") {
+          setMsg(`Payment is still pending. Please wait for confirmation.`);
         } else {
-          setMsg("Payment reference not found or invalid.");
+          setMsg("Payment failed or not confirmed.");
         }
       } catch (err) {
         console.error(err);
@@ -42,7 +43,7 @@ export default function SuccessPage() {
     };
 
     fetchStatus();
-  }, [ref]);
+  }, [orderId, registrationId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
