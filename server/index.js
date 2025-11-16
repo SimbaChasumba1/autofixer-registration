@@ -1,7 +1,49 @@
+import express from 'express';
+import multer from 'multer';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { uploadVideo } from './supabase.js';
+import fetch from 'node-fetch'; 
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const uploads = multer();
+
+// Temporary in-memory storage for registrations
+const registrations = [];
+
+// Upload & create pending registration
+app.post('/api/create-pending', uploads.single('video'), async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!name || !email || !phone) return res.status(400).json({ error: 'Missing fields' });
+    if (!req.file) return res.status(400).json({ error: 'Video required' });
+
+    const { buffer, originalname, mimetype } = req.file;
+
+    // Upload video to Supabase
+    const videoUrl = await uploadVideo(buffer, `${Date.now()}-${originalname}`, mimetype);
+
+    // Store registration
+    const id = Date.now().toString();
+    const registration = { id, name, email, phone, videoUrl, paid: false };
+    registrations.push(registration);
+
+    res.json({ id, registration });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create PayPal order
 app.post('/api/create-paypal-order', async (req, res) => {
   try {
     const { amount } = req.body;
-
     const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
     const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 
@@ -62,3 +104,6 @@ app.post('/api/create-paypal-order', async (req, res) => {
     res.status(500).json({ error: "PayPal error", details: err.message });
   }
 });
+
+const port = process.env.PORT || 5000;
+app.listen(port, () => console.log(`Server running on ${port}`));
