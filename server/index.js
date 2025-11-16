@@ -16,14 +16,14 @@ const registrations = [];
 
 let paypalAccessToken = null;
 let tokenExpiryTime = 0;
-const PAYPAL_API_URL = process.env.PAYPAL_API_URL || 'https://api-m.paypal.com'; // PayPal API URL
-const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;  // PayPal Client ID
-const SECRET = process.env.PAYPAL_SECRET; // PayPal Secret
+const PAYPAL_API_URL = process.env.PAYPAL_API_URL || 'https://api-m.paypal.com';  // Ensure you're using the correct live endpoint
+const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const SECRET = process.env.PAYPAL_SECRET;
 
 // Function to refresh PayPal token
 async function refreshPayPalToken() {
   const auth = Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64');
-  console.log("Authorization header (Base64):", auth); // Log to verify
+  console.log("Refreshing PayPal token...");
 
   try {
     const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
@@ -36,14 +36,12 @@ async function refreshPayPalToken() {
     });
 
     const data = await response.json();
-    console.log("PayPal Token Response:", data);  // Log PayPal response
-
     if (data.error) {
       throw new Error('Failed to get new PayPal token');
     }
 
     paypalAccessToken = data.access_token;
-    tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set expiration time
+    tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set the expiration time
     console.log('PayPal token refreshed successfully');
   } catch (error) {
     console.error('Error refreshing PayPal token:', error);
@@ -81,14 +79,13 @@ app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
 app.post("/api/create-paypal-order", async (req, res) => {
   const { amount } = req.body;
 
-  if (!amount) {
-    return res.status(400).json({ error: "Amount is required" });
-  }
-
   try {
     if (!paypalAccessToken) {
       return res.status(500).json({ error: "PayPal token is not available" });
     }
+
+    // Log the token to ensure it's valid before using
+    console.log("Using PayPal Access Token:", paypalAccessToken);
 
     const orderRes = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
       method: "POST",
@@ -124,10 +121,10 @@ app.post("/api/create-paypal-order", async (req, res) => {
 
 // Payment status update
 app.post("/api/paypal-payment-status", async (req, res) => {
-  const { orderId, registrationId } = req.body;
+  const { orderId, registrationId } = req.body; // Expect both orderId and registrationId
 
   try {
-    // Find the registration based on registrationId
+    // Find the registration based on the provided registrationId
     const registration = registrations.find(reg => reg.id === registrationId);
     if (!registration) {
       return res.status(404).json({ error: "Registration not found" });
@@ -141,13 +138,14 @@ app.post("/api/paypal-payment-status", async (req, res) => {
     });
 
     const orderData = await orderRes.json();
-    console.log("PayPal Order Status:", orderData); // Log order data
 
     if (orderData.status === 'COMPLETED') {
       // Update the registration payment status
       registration.paid = true;
-
-      // You can do additional things here, like updating the database or sending a confirmation email.
+      
+      // Here you can also update registration details in a database if needed
+      // For example, adding the video link or any other info you want to attach
+      
       res.json({ success: true, message: "Payment successful", registration });
     } else {
       res.json({ success: false, message: "Payment not completed" });
