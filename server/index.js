@@ -52,6 +52,8 @@ app.post('/api/create-paypal-order', async (req, res) => {
     }
 
     const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64");
+    console.log("Authorization Header:", `Basic ${auth}`);
+
 
     // LIVE PayPal token URL
     const tokenRes = await fetch("https://api-m.paypal.com/v1/oauth2/token", {
