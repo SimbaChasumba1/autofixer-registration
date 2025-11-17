@@ -6,6 +6,7 @@ export default function UploadVideoPage() {
   const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(false);
   const API = import.meta.env.VITE_API_URL || 'https://autofixer-registration.onrender.com';  // API URL
+  const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID;  // PayPal Client ID from environment
   const navigate = useNavigate();
 
   const handleFile = (e) => setVideo(e.target.files?.[0] ?? null);
