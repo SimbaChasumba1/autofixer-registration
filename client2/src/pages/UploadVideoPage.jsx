@@ -5,7 +5,7 @@ export default function UploadVideoPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(false);
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';  // API URL
+  const API = import.meta.env.VITE_API_URL || 'https://autofixer-registration.onrender.com';  // API URL
   const navigate = useNavigate();
 
   const handleFile = (e) => setVideo(e.target.files?.[0] ?? null);
