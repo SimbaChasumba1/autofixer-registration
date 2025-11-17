@@ -2,58 +2,48 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 dotenv.config();
 
-let paypalAccessToken = null;
-let tokenExpiryTime = 0;
+let payPalAccessToken = null;
+let tokenExpiration = null; // Token expiration time
 
-const PAYPAL_API_URL = process.env.PAYPAL_API_URL;
-const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const SECRET = process.env.PAYPAL_SECRET;
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 
-// Function to refresh PayPal token
-export async function refreshPayPalToken() {
-    const auth = Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64');
+// Function to check if the token has expired
+const isTokenExpired = () => {
+  if (!payPalAccessToken || !tokenExpiration) return true;
+  return Date.now() > tokenExpiration; // Check if the current time is past the token expiration
+};
+
+// Function to get PayPal Access Token (and refresh if expired)
+const getPayPalAccessToken = async () => {
+  if (!payPalAccessToken || isTokenExpired()) {
     console.log("Refreshing PayPal token...");
 
     try {
-        const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Basic ${auth}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'grant_type=client_credentials',
-        });
+      // Fetch new token from PayPal
+      const response = await fetch('https://api.paypal.com/v1/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ grant_type: 'client_credentials' }),
+      });
 
+      if (response.ok) {
         const data = await response.json();
-        console.log('PayPal Token Response Status:', response.status);
-        console.log('PayPal Token Response Data:', data);
-
-        if (!response.ok || data.error) {
-            throw new Error(`Failed to get new PayPal token: ${data.error_description || 'Unknown error'}`);
-        }
-
-        paypalAccessToken = data.access_token;
-        tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set the new expiration time
-        console.log('PayPal token refreshed successfully:', paypalAccessToken); // Log the token for debugging
+        payPalAccessToken = data.access_token;
+        tokenExpiration = Date.now() + (data.expires_in * 1000); // Store token expiry time (in milliseconds)
+        console.log("New PayPal token obtained:", payPalAccessToken);
+      } else {
+        throw new Error('Failed to refresh PayPal token');
+      }
     } catch (error) {
-        console.error('Error refreshing PayPal token:', error.message);
+      console.error('Error refreshing PayPal token:', error);
     }
-}
+  }
 
-// Function to check and get a valid PayPal token
-export async function getPayPalAccessToken() {
-    // Check if the token is expired before proceeding
-    if (Date.now() >= tokenExpiryTime) {
-        console.log('Token expired, refreshing...');
-        await refreshPayPalToken(); // Refresh token if expired
-    }
+  return payPalAccessToken;
+};
 
-    // Check if token is still null
-    if (!paypalAccessToken) {
-        console.error('PayPal access token is still null!');
-        throw new Error('No PayPal access token available!');
-    }
-
-    console.log('Returning PayPal access token:', paypalAccessToken); // Log the token before using it
-    return paypalAccessToken;
-}
+module.exports = { getPayPalAccessToken };
