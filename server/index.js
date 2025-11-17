@@ -36,7 +36,9 @@ async function refreshPayPalToken() {
     });
 
     const data = await response.json();
-    if (data.error) {
+
+    if (!response.ok) {
+      console.error("PayPal token request failed:", data);
       throw new Error('Failed to get new PayPal token');
     }
 
