@@ -1,11 +1,11 @@
-// index.js
 import express from "express";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
-import { uploadVideo } from "./supabase.js";
-import { createPayPalOrder, getPayPalAccessToken } from "./paypal.js"; // Import PayPal logic from paypal.js
+import { uploadVideo } from "./supabase.js"; 
+import fetch from "node-fetch";
 import nodeCron from "node-cron";
+import { getPayPalAccessToken } from "./paypal.js"; 
 
 dotenv.config();
 const app = express();
@@ -13,31 +13,11 @@ app.use(cors());
 app.use(express.json());
 
 const uploads = multer();
-const registrations = [];
+const registrations = []; 
 
-let paypalAccessToken = null;
-let tokenExpiryTime = 0;
-
-const PAYPAL_API_URL = process.env.PAYPAL_API_URL || 'https://api-m.paypal.com';  // Ensure you're using the correct live endpoint
+const PAYPAL_API_URL = process.env.PAYPAL_API_URL || 'https://api-m.paypal.com'; 
 const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const SECRET = process.env.PAYPAL_SECRET;
-
-// Function to refresh PayPal token (This now uses paypal.js)
-async function refreshPayPalToken() {
-  try {
-    paypalAccessToken = await getPayPalAccessToken(); // Get valid token from paypal.js
-    tokenExpiryTime = Date.now() + 1000 * 60 * 60 * 8; // Set token expiry to 8 hours
-    console.log('PayPal token refreshed successfully');
-  } catch (error) {
-    console.error('Error refreshing PayPal token:', error);
-  }
-}
-
-// Automatically refresh the token every 8 hours
-nodeCron.schedule('0 */8 * * *', refreshPayPalToken);
-
-// Initial token refresh when the app starts
-refreshPayPalToken();
 
 // Create pending registration endpoint
 app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
@@ -60,19 +40,36 @@ app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
   }
 });
 
-// Create PayPal order (Refactored to use paypal.js function)
+// Create PayPal order
 app.post("/api/create-paypal-order", async (req, res) => {
   const { amount } = req.body;
 
   try {
-    const token = await getPayPalAccessToken(); // Get the valid PayPal token
+    const paypalAccessToken = await getPayPalAccessToken(); // Ensure the token is valid
+    console.log("Using PayPal Access Token:", paypalAccessToken); // Log the token to ensure it’s set
 
-    // Log the token to ensure it's valid before using
-    console.log("Using PayPal Access Token:", token);
+    const orderRes = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${paypalAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            amount: {
+              currency_code: "USD",
+              value: amount,
+            },
+          },
+        ],
+      }),
+    });
 
-    const orderData = await createPayPalOrder(amount, token); // Use paypal.js to create the order
-
-    if (orderData.error) {
+    const orderData = await orderRes.json();
+    if (!orderRes.ok) {
+      console.error('PayPal order creation failed:', orderData);
       return res.status(500).json({ error: "PayPal order creation failed", details: orderData });
     }
 
@@ -88,7 +85,6 @@ app.post("/api/paypal-payment-status", async (req, res) => {
   const { orderId, registrationId } = req.body; // Expect both orderId and registrationId
 
   try {
-    // Find the registration based on the provided registrationId
     const registration = registrations.find(reg => reg.id === registrationId);
     if (!registration) {
       return res.status(404).json({ error: "Registration not found" });
@@ -104,12 +100,7 @@ app.post("/api/paypal-payment-status", async (req, res) => {
     const orderData = await orderRes.json();
 
     if (orderData.status === 'COMPLETED') {
-      // Update the registration payment status
       registration.paid = true;
-      
-      // Here you can also update registration details in a database if needed
-      // For example, adding the video link or any other info you want to attach
-      
       res.json({ success: true, message: "Payment successful", registration });
     } else {
       res.json({ success: false, message: "Payment not completed" });
