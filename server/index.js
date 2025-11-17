@@ -1,9 +1,10 @@
+// index.js
 import express from "express";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
-import { uploadVideo } from "./supabase.js"; 
-import fetch from "node-fetch";
+import { uploadVideo } from "./supabase.js";
+import { createPayPalOrder, getPayPalAccessToken } from "./paypal.js"; // Import PayPal logic from paypal.js
 import nodeCron from "node-cron";
 
 dotenv.config();
@@ -12,38 +13,20 @@ app.use(cors());
 app.use(express.json());
 
 const uploads = multer();
-const registrations = []; 
+const registrations = [];
 
 let paypalAccessToken = null;
 let tokenExpiryTime = 0;
+
 const PAYPAL_API_URL = process.env.PAYPAL_API_URL || 'https://api-m.paypal.com';  // Ensure you're using the correct live endpoint
 const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const SECRET = process.env.PAYPAL_SECRET;
 
-// Function to refresh PayPal token
+// Function to refresh PayPal token (This now uses paypal.js)
 async function refreshPayPalToken() {
-  const auth = Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64');
-  console.log("Refreshing PayPal token...");
-
   try {
-    const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: 'grant_type=client_credentials',
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("PayPal token request failed:", data);
-      throw new Error('Failed to get new PayPal token');
-    }
-
-    paypalAccessToken = data.access_token;
-    tokenExpiryTime = Date.now() + data.expires_in * 1000; // Set the expiration time
+    paypalAccessToken = await getPayPalAccessToken(); // Get valid token from paypal.js
+    tokenExpiryTime = Date.now() + 1000 * 60 * 60 * 8; // Set token expiry to 8 hours
     console.log('PayPal token refreshed successfully');
   } catch (error) {
     console.error('Error refreshing PayPal token:', error);
@@ -77,40 +60,19 @@ app.post("/api/create-pending", uploads.single("video"), async (req, res) => {
   }
 });
 
-// Create PayPal order
+// Create PayPal order (Refactored to use paypal.js function)
 app.post("/api/create-paypal-order", async (req, res) => {
   const { amount } = req.body;
 
   try {
-    if (!paypalAccessToken) {
-      return res.status(500).json({ error: "PayPal token is not available" });
-    }
+    const token = await getPayPalAccessToken(); // Get the valid PayPal token
 
     // Log the token to ensure it's valid before using
-    console.log("Using PayPal Access Token:", paypalAccessToken);
+    console.log("Using PayPal Access Token:", token);
 
-    const orderRes = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${paypalAccessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        intent: "CAPTURE",
-        purchase_units: [
-          {
-            amount: {
-              currency_code: "USD",
-              value: amount,
-            },
-          },
-        ],
-      }),
-    });
+    const orderData = await createPayPalOrder(amount, token); // Use paypal.js to create the order
 
-    const orderData = await orderRes.json();
-    if (!orderRes.ok) {
-      console.error('PayPal order creation failed:', orderData);
+    if (orderData.error) {
       return res.status(500).json({ error: "PayPal order creation failed", details: orderData });
     }
 

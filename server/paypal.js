@@ -1,5 +1,6 @@
-const fetch = require('node-fetch');
-const dotenv = require('dotenv');
+// paypal.js
+import fetch from 'node-fetch';
+import dotenv from 'dotenv';
 dotenv.config();
 
 let paypalAccessToken = null;
@@ -10,7 +11,7 @@ const CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const SECRET = process.env.PAYPAL_SECRET;
 
 // Function to refresh PayPal token
-async function refreshPayPalToken() {
+export async function refreshPayPalToken() {
     const auth = Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64');
 
     try {
@@ -38,7 +39,7 @@ async function refreshPayPalToken() {
 }
 
 // Function to check and get a valid PayPal token
-async function getPayPalAccessToken() {
+export async function getPayPalAccessToken() {
     if (Date.now() >= tokenExpiryTime) {
         await refreshPayPalToken(); // Refresh token if expired
     }
@@ -46,9 +47,7 @@ async function getPayPalAccessToken() {
 }
 
 // Example API call to create a PayPal order
-async function createPayPalOrder() {
-    const token = await getPayPalAccessToken();
-    
+export async function createPayPalOrder(amount, token) {
     try {
         const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
             method: 'POST',
@@ -62,7 +61,7 @@ async function createPayPalOrder() {
                     {
                         amount: {
                             currency_code: 'USD',
-                            value: '10.00',
+                            value: amount,
                         },
                     },
                 ],
@@ -70,11 +69,9 @@ async function createPayPalOrder() {
         });
 
         const data = await response.json();
-        console.log('PayPal Order Created:', data);
+        return data;
     } catch (error) {
         console.error('Error creating PayPal order:', error);
+        return { error: "Error creating PayPal order" };
     }
 }
-
-// Export functions so you can use them in your main app
-module.exports = { createPayPalOrder, getPayPalAccessToken };
