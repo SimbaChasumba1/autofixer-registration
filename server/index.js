@@ -65,7 +65,7 @@ app.post("/api/create-paypal-order", async (req, res) => {
         purchase_units: [
           {
             amount: {
-              currency_code: "ZAR",
+              currency_code: "USD",
               value: amount,
             },
           },
