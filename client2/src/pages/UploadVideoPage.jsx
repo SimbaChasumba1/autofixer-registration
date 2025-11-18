@@ -47,7 +47,7 @@ export default function UploadVideoPage() {
       const createOrderRes = await fetch(`${API}/api/create-paypal-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 20 }), // Adjust the amount dynamically
+        body: JSON.stringify({ amount: 2 }), // Adjust the amount dynamically
       });
 
       const orderData = await createOrderRes.json();
