@@ -38,39 +38,38 @@ export default function UploadVideoPage() {
         body: fd,
       });
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Create pending failed");
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || "Video upload failed");
+      }
 
-      const registrationId = json.id;
+      const { id: registrationId } = await res.json();
 
       // 2️⃣ Initialize PayPal transaction
       const createOrderRes = await fetch(`${API}/api/create-paypal-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 2 }), // Adjust the amount dynamically
+        body: JSON.stringify({ amount: 2 }),
       });
 
-      const orderData = await createOrderRes.json();
-      if (!createOrderRes.ok) throw new Error(orderData.error || "PayPal init failed");
-
-      // 3️⃣ Redirect to PayPal for payment
-      if (orderData.links) {
-        const approvalLink = orderData.links.find(link => link.rel === 'approve');
-        if (approvalLink) {
-          // Store the orderId and registrationId in the state before redirecting
-          navigate('/success', { state: { orderId: orderData.id, registrationId } });
-          // Redirect to the PayPal approval page
-          window.location.href = approvalLink.href;  // User is redirected to PayPal
-        } else {
-          throw new Error("PayPal approval link not found.");
-        }
-      } else {
-        throw new Error("PayPal approval link missing in response.");
+      if (!createOrderRes.ok) {
+        const orderData = await createOrderRes.json();
+        throw new Error(orderData.error || "PayPal initialization failed");
       }
+
+      const orderData = await createOrderRes.json();
+
+      // 3️⃣ Redirect straight to PayPal
+      const approvalLink = orderData.links?.find(link => link.rel === 'approve');
+      if (!approvalLink) throw new Error("PayPal approval link not found");
+
+      // Redirect to PayPal
+      window.location.href = approvalLink.href;
+
     } catch (error) {
       alert(`Error: ${error.message}`);
     } finally {
-      setLoading(false); // Reset loading state even if there's an error
+      setLoading(false);
     }
   };
 
