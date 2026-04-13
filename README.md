@@ -11,6 +11,14 @@ The application guides users through a structured multi-step flow where they can
 
 This project was built as a **real-world client-style application** and forms part of my professional portfolio.
 
+# Live Link
+
+https://lnkd.in/dRvtDgTx
+
+# Video Walkthrough 
+
+https://simbachasumba.vercel.app/work/client-project
+
 
 # Project Overview
 
