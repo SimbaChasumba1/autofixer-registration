@@ -32,7 +32,7 @@ return data.publicUrl;
 // ===============================
 export const saveRegistration = async (registration) => {
 const { data, error } = await supabase
-.from("Client Details") // <-- Your Table
+.from("User Details") // <-- Your Table
 .insert([
 {
 name: registration.name,
@@ -56,7 +56,7 @@ return data;
 // ===============================
 export const markRegistrationAsPaid = async (id) => {
 const { data, error } = await supabase
-.from("Client Details")
+.from("User Details")
 .update({
 paid: true,
 })
@@ -73,7 +73,7 @@ return data;
 // ===============================
 export const fetchUsers = async () => {
 const { data, error } = await supabase
-.from("Client Details")
+.from("User Details")
 .select("*")
 .order("created_at", { ascending: false });
 
