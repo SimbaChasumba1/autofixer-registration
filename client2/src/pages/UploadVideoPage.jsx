@@ -2,126 +2,200 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function UploadVideoPage() {
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
-  const [video, setVideo] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const API = import.meta.env.VITE_API_URL || 'https://autofixer-registration.onrender.com';  // API URL
-  const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID;  // PayPal Client ID from environment
-  const navigate = useNavigate();
+const navigate = useNavigate();
 
-  const handleFile = (e) => setVideo(e.target.files?.[0] ?? null);
+const [video, setVideo] = useState(null);
+const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const API =
+import.meta.env.VITE_API_URL ||
+"https://autofixer-registration.onrender.com";
 
-    // Form validation
-    if (!form.name || !form.email || !form.phone) {
-      return alert("Please fill all fields.");
-    }
+const savedForm = JSON.parse(
+sessionStorage.getItem("autofixer_form") || "{}"
+);
 
-    if (!video) {
-      return alert("Please select a video to upload.");
-    }
+// Prevent direct access without registering first
+if (!savedForm.name) {
+alert("Please complete the registration form first.");
+navigate("/register");
+return null;
+}
 
-    setLoading(true);
+const handleFile = (e) => {
+setVideo(e.target.files?.[0] ?? null);
+};
 
-    try {
-      // 1️⃣ Send form + video to backend
-      const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("email", form.email);
-      fd.append("phone", form.phone);
-      fd.append("video", video);
+const handleSubmit = async (e) => {
+e.preventDefault();
 
-      const res = await fetch(`${API}/api/create-pending`, {
-        method: "POST",
-        body: fd,
-      });
+if (!video) {
+return alert("Please select a promo video.");
+}
 
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.error || "Video upload failed");
-      }
+setLoading(true);
 
-      const { id: registrationId } = await res.json();
+try {
+// Create multipart form
+const fd = new FormData();
 
-      // 2️⃣ Initialize PayPal transaction
-      const createOrderRes = await fetch(`${API}/api/create-paypal-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 2 }),
-      });
+fd.append("name", savedForm.name);
+fd.append("email", savedForm.email);
+fd.append("phone", savedForm.phone);
+fd.append("institution", savedForm.institution);
+fd.append("educationLevel", savedForm.educationLevel);
+fd.append("acceptedTerms", savedForm.acceptedTerms);
 
-      if (!createOrderRes.ok) {
-        const orderData = await createOrderRes.json();
-        throw new Error(orderData.error || "PayPal initialization failed");
-      }
+fd.append("video", video);
 
-      const orderData = await createOrderRes.json();
+// Upload registration
+const res = await fetch(`${API}/api/create-pending`, {
+method: "POST",
+body: fd,
+});
 
-      // 3️⃣ Redirect straight to PayPal
-      const approvalLink = orderData.links?.find(link => link.rel === 'approve');
-      if (!approvalLink) throw new Error("PayPal approval link not found");
+const uploadData = await res.json();
 
-      // Redirect to PayPal
-      window.location.href = approvalLink.href;
+if (!res.ok) {
+throw new Error(uploadData.error || "Video upload failed");
+}
 
-    } catch (error) {
-      alert(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+const registrationId = uploadData.id;
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-blue-600 to-cyan-500 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        <h2 className="text-2xl font-bold mb-4 text-center">Register & Upload Promo Video</h2>
+// Create PayPal order
+const createOrderRes = await fetch(
+`${API}/api/create-paypal-order`,
+{
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+},
+body: JSON.stringify({
+amount: 2,
+}),
+}
+);
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            name="name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Full name"
-            className="w-full border p-3 rounded-lg"
-            required
-          />
-          <input
-            name="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            placeholder="Email address"
-            type="email"
-            className="w-full border p-3 rounded-lg"
-            required
-          />
-          <input
-            name="phone"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            placeholder="Phone number"
-            className="w-full border p-3 rounded-lg"
-            required
-          />
-          <input
-            type="file"
-            accept="video/*"
-            onChange={handleFile}
-            className="w-full border p-3 rounded-lg"
-          />
-          <p className="text-sm text-gray-500">
-            Video upload is temporary until payment is verified.
-          </p>
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg"
-            disabled={loading}
-          >
-            {loading ? "Processing..." : "Pay R20 & Register"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+const orderData = await createOrderRes.json();
+
+if (!createOrderRes.ok) {
+throw new Error(
+orderData.error || "PayPal initialization failed"
+);
+}
+
+// Save registration id for success page
+sessionStorage.setItem(
+"registrationId",
+registrationId
+);
+
+// Find PayPal approval link
+const approvalLink = orderData.links?.find(
+(link) => link.rel === "approve"
+);
+
+if (!approvalLink) {
+throw new Error("PayPal approval link not found.");
+}
+
+// Redirect to PayPal
+window.location.href = approvalLink.href;
+} catch (err) {
+alert(err.message);
+} finally {
+setLoading(false);
+}
+};
+
+return (
+<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-blue-600 to-cyan-500 p-4">
+
+<div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8">
+
+<h1 className="text-3xl font-bold text-center mb-2">
+Upload Promo Video
+</h1>
+
+<p className="text-center text-gray-600 mb-6">
+You're almost done. Upload your promotional video to continue to payment.
+</p>
+
+{/* Registration Summary */}
+
+<div className="bg-gray-100 rounded-xl p-5 mb-6">
+
+<h2 className="font-semibold text-lg mb-3">
+Registration Summary
+</h2>
+
+<div className="space-y-2 text-gray-700">
+
+<p>
+<strong>Name:</strong> {savedForm.name}
+</p>
+
+<p>
+<strong>Email:</strong> {savedForm.email}
+</p>
+
+<p>
+<strong>Phone:</strong> {savedForm.phone}
+</p>
+
+<p>
+<strong>Institution:</strong>{" "}
+{savedForm.institution}
+</p>
+
+<p>
+<strong>Education Level:</strong>{" "}
+{savedForm.educationLevel}
+</p>
+
+</div>
+
+</div>
+
+<form
+onSubmit={handleSubmit}
+className="space-y-5"
+>
+
+<div>
+
+<label className="block font-medium mb-2">
+Upload Promo Video
+</label>
+
+<input
+type="file"
+accept="video/*"
+onChange={handleFile}
+className="w-full border rounded-lg p-3"
+required
+/>
+
+<p className="text-sm text-gray-500 mt-2">
+Upload an original promotional video between 10 and 60 seconds.
+</p>
+
+</div>
+
+<button
+type="submit"
+disabled={loading}
+className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition disabled:opacity-60"
+>
+{loading
+? "Processing..."
+: "Proceed to Pay R20"}
+</button>
+
+</form>
+
+</div>
+
+</div>
+);
 }
