@@ -9,77 +9,94 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ===============================
+// Sanitize video filename
+// ===============================
+function sanitizeFileName(filename) {
+    return filename
+        .normalize("NFKD")
+        .replace(/[^\w.-]/g, "_")
+        .replace(/_+/g, "_");
+}
+
+// ===============================
 // Upload video to Supabase Storage
 // ===============================
 export const uploadVideo = async (fileBuffer, filename, mimetype) => {
-const { error } = await supabase.storage
-.from("Promo Videos") // <-- Your Storage Bucket
-.upload(filename, fileBuffer, {
-contentType: mimetype,
-});
+    const safeFileName = sanitizeFileName(filename);
 
-if (error) throw error;
+    // Generate a unique filename
+    const fileName = `${Date.now()}-${safeFileName}`;
 
-const { data } = supabase.storage
-.from("Promo Videos")
-.getPublicUrl(filename);
+    const { error } = await supabase.storage
+        .from("Promo Videos")
+        .upload(fileName, fileBuffer, {
+            contentType: mimetype,
+            upsert: false,
+        });
 
-return data.publicUrl;
+    if (error) {
+        console.error("Supabase upload error:", error);
+        throw error;
+    }
+
+    const { data } = supabase.storage
+        .from("Promo Videos")
+        .getPublicUrl(fileName);
+
+    return data.publicUrl;
 };
 
 // ===============================
 // Save registration to database
 // ===============================
 export const saveRegistration = async (registration) => {
-const { data, error } = await supabase
-.from("User Details") // <-- Your Table
-.insert([
-{
-name: registration.name,
-email: registration.email,
-phone: registration.phone,
-institution: registration.institution,
-education_level: registration.educationLevel,
-video_url: registration.videoUrl,
-paid: registration.paid,
-},
-])
-.select();
+    const { data, error } = await supabase
+        .from("User Details")
+        .insert([
+            {
+                name: registration.name,
+                email: registration.email,
+                phone: registration.phone,
+                institution: registration.institution,
+                education_level: registration.educationLevel,
+                video_url: registration.videoUrl,
+                paid: registration.paid,
+            },
+        ])
+        .select();
 
-if (error) throw error;
+    if (error) throw error;
 
-return data;
+    return data;
 };
 
 // ===============================
 // Update payment status
 // ===============================
 export const markRegistrationAsPaid = async (id) => {
-const { data, error } = await supabase
-.from("User Details")
-.update({
-paid: true,
-})
-.eq("id", id)
-.select();
+    const { data, error } = await supabase
+        .from("User Details")
+        .update({
+            paid: true,
+        })
+        .eq("id", id)
+        .select();
 
-if (error) throw error;
+    if (error) throw error;
 
-return data;
+    return data;
 };
 
 // ===============================
 // Fetch all registrations
 // ===============================
 export const fetchUsers = async () => {
-const { data, error } = await supabase
-.from("User Details")
-.select("*")
-.order("created_at", { ascending: false });
+    const { data, error } = await supabase
+        .from("User Details")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-if (error) throw error;
+    if (error) throw error;
 
-return data;
+    return data;
 };
-
-
